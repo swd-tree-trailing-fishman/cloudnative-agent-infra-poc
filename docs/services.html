@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Services — Cloud Native AI Agent Infra</title>
+<style>
+:root{
+  --bg:#07090f;--surface:#0d1117;--card:#161b27;--border:#21293d;--border-hi:#3d4f6e;
+  --text:#cdd9f0;--muted:#6b7a99;
+  --go:#00aed8;--py:#ffd43b;--k8s:#326ce5;--istio:#7c83ff;--keda:#56d4a0;--otel:#ffa94d;--red:#ff6b9d;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+nav{display:flex;align-items:center;gap:1.5rem;padding:.8rem 2rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+nav .logo{font-weight:700;font-size:1rem;color:var(--istio);white-space:nowrap}
+nav a{color:var(--muted);text-decoration:none;font-size:.85rem;padding:.3rem .7rem;border-radius:6px;transition:.2s}
+nav a:hover,nav a.active{background:var(--card);color:var(--text)}
+.hero{text-align:center;padding:3rem 2rem 2rem;border-bottom:1px solid var(--border)}
+.hero h1{font-size:2rem;font-weight:700;background:linear-gradient(90deg,var(--go),var(--keda));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--muted);margin-top:.5rem}
+main{max-width:1100px;margin:0 auto;padding:2rem 1.5rem 5rem}
+section{margin-bottom:4rem}
+h2{font-size:1.4rem;color:var(--istio);margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+h3{font-size:1rem;color:var(--keda);margin:1.5rem 0 .8rem}
+p{margin-bottom:.8rem;font-size:.9rem;color:var(--text)}
+.svg-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin:1rem 0}
+.svg-wrap svg{display:block;width:100%;height:auto}
+.api-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;margin:1rem 0}
+.api-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.2rem}
+.api-card h4{font-size:.95rem;margin-bottom:.8rem;display:flex;align-items:center;gap:.5rem}
+.method{display:inline-block;font-size:.72rem;font-weight:700;border-radius:4px;padding:.15rem .45rem;font-family:monospace}
+.method-get{background:rgba(86,212,160,.15);color:var(--keda);border:1px solid rgba(86,212,160,.3)}
+.method-post{background:rgba(255,169,77,.15);color:var(--otel);border:1px solid rgba(255,169,77,.3)}
+.endpoint-list{list-style:none}
+.endpoint-list li{display:flex;align-items:baseline;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.83rem}
+.endpoint-list li:last-child{border:none}
+.ep-path{font-family:monospace;color:var(--text)}
+.ep-desc{color:var(--muted);font-size:.8rem}
+.dep-table{width:100%;border-collapse:collapse;font-size:.84rem;margin:1rem 0}
+.dep-table th,.dep-table td{border:1px solid var(--border);padding:.55rem .85rem;text-align:left}
+.dep-table th{background:var(--card);color:var(--istio)}
+.dep-table td:nth-child(1){font-weight:600;color:var(--go)}
+.dep-table td:nth-child(3){font-family:monospace;font-size:.78rem;color:var(--otel)}
+.dep-table td:nth-child(4){color:var(--muted);font-size:.8rem}
+.badge-proto{display:inline-block;font-size:.7rem;border-radius:4px;padding:.1rem .4rem;margin-right:.3rem}
+.bp-grpc{background:rgba(0,174,216,.12);color:var(--go);border:1px solid rgba(0,174,216,.3)}
+.bp-http{background:rgba(86,212,160,.1);color:var(--keda);border:1px solid rgba(86,212,160,.3)}
+.bp-k8s{background:rgba(50,108,229,.12);color:var(--k8s);border:1px solid rgba(50,108,229,.3)}
+.bp-sqs{background:rgba(255,212,59,.1);color:var(--py);border:1px solid rgba(255,212,59,.3)}
+footer{text-align:center;padding:2rem;border-top:1px solid var(--border);color:var(--muted);font-size:.82rem}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">☸ Cloud Native PoC</span>
+  <a href="index.html">概要</a>
+  <a href="architecture.html">🏗 Architecture</a>
+  <a href="network.html">🕸 Network</a>
+  <a href="services.html" class="active">🔗 Services</a>
+</nav>
+
+<div class="hero">
+  <h1>🔗 サービス依存関係マップ</h1>
+  <p>全サービス間の通信プロトコル・エンドポイント・依存関係を可視化</p>
+</div>
+
+<main>
+
+<!-- ===== SERVICE MAP SVG ===== -->
+<section id="servicemap">
+  <h2>📊 サービス依存関係グラフ</h2>
+
+  <div class="svg-wrap">
+    <svg viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,sans-serif">
+      <defs>
+        <linearGradient id="sbg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0d1117"/>
+          <stop offset="100%" stop-color="#07090f"/>
+        </linearGradient>
+        <!-- Arrow markers -->
+        <marker id="m-go" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#00aed8"/></marker>
+        <marker id="m-otel" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#ffa94d"/></marker>
+        <marker id="m-keda" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#56d4a0"/></marker>
+        <marker id="m-py" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#ffd43b"/></marker>
+        <marker id="m-red" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#ff6b9d"/></marker>
+        <marker id="m-k8s" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#326ce5"/></marker>
+        <filter id="shadow">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity=".4"/>
+        </filter>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <rect width="960" height="620" fill="url(#sbg)"/>
+
+      <!-- ===== SERVICE NODES ===== -->
+
+      <!-- Client (top-left) -->
+      <g transform="translate(60,60)">
+        <rect width="120" height="70" rx="12" fill="#0d1117" stroke="#3d4f6e" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="60" y="25" text-anchor="middle" font-size="20">👤</text>
+        <text x="60" y="44" text-anchor="middle" font-size="11" fill="#cdd9f0" font-weight="600">Client</text>
+        <text x="60" y="59" text-anchor="middle" font-size="9" fill="#6b7a99">curl / browser</text>
+      </g>
+
+      <!-- Go API (center-left) -->
+      <g transform="translate(260,180)">
+        <rect width="150" height="100" rx="12" fill="#00aed8" fill-opacity=".1" stroke="#00aed8" stroke-width="2" filter="url(#shadow)"/>
+        <text x="75" y="28" text-anchor="middle" font-size="22">🐹</text>
+        <text x="75" y="50" text-anchor="middle" font-size="12" fill="#00aed8" font-weight="700">Go API</text>
+        <text x="75" y="66" text-anchor="middle" font-size="9" fill="#6b7a99">agent-backend</text>
+        <text x="75" y="80" text-anchor="middle" font-size="9" fill="#6b7a99">agent-infra ns</text>
+        <text x="75" y="94" text-anchor="middle" font-size="9" fill="#3d4f6e">:8080</text>
+      </g>
+
+      <!-- OTLP Collector (top-center) -->
+      <g transform="translate(480,60)">
+        <rect width="140" height="80" rx="12" fill="#ffa94d" fill-opacity=".1" stroke="#ffa94d" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="70" y="26" text-anchor="middle" font-size="18">📡</text>
+        <text x="70" y="46" text-anchor="middle" font-size="11" fill="#ffa94d" font-weight="700">OTLP Collector</text>
+        <text x="70" y="61" text-anchor="middle" font-size="9" fill="#6b7a99">observability ns</text>
+        <text x="70" y="74" text-anchor="middle" font-size="9" fill="#3d4f6e">:4317 gRPC</text>
+      </g>
+
+      <!-- Jaeger (top-right) -->
+      <g transform="translate(700,60)">
+        <rect width="130" height="80" rx="12" fill="#ffa94d" fill-opacity=".07" stroke="#ffa94d" stroke-width="1" filter="url(#shadow)"/>
+        <text x="65" y="26" text-anchor="middle" font-size="18">🔭</text>
+        <text x="65" y="46" text-anchor="middle" font-size="11" fill="#ffa94d" font-weight="700">Jaeger UI</text>
+        <text x="65" y="61" text-anchor="middle" font-size="9" fill="#6b7a99">observability ns</text>
+        <text x="65" y="74" text-anchor="middle" font-size="9" fill="#3d4f6e">:16686</text>
+      </g>
+
+      <!-- Sandbox Job (right) -->
+      <g transform="translate(700,200)">
+        <rect width="140" height="100" rx="12" fill="#ff6b9d" fill-opacity=".08" stroke="#ff6b9d" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#shadow)"/>
+        <text x="70" y="26" text-anchor="middle" font-size="18">📦</text>
+        <text x="70" y="46" text-anchor="middle" font-size="11" fill="#ff6b9d" font-weight="700">Sandbox Job</text>
+        <text x="70" y="62" text-anchor="middle" font-size="9" fill="#6b7a99">agent-sandbox ns</text>
+        <text x="70" y="76" text-anchor="middle" font-size="9" fill="#6b7a99">busybox:1.36</text>
+        <text x="70" y="90" text-anchor="middle" font-size="9" fill="#ffa94d">TTL: 60s</text>
+      </g>
+
+      <!-- Django (bottom-left) -->
+      <g transform="translate(60,380)">
+        <rect width="150" height="100" rx="12" fill="#ffd43b" fill-opacity=".08" stroke="#ffd43b" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="75" y="28" text-anchor="middle" font-size="22">🐍</text>
+        <text x="75" y="50" text-anchor="middle" font-size="12" fill="#ffd43b" font-weight="700">Django API</text>
+        <text x="75" y="66" text-anchor="middle" font-size="9" fill="#6b7a99">django-migration</text>
+        <text x="75" y="80" text-anchor="middle" font-size="9" fill="#6b7a99">event-driven ns</text>
+        <text x="75" y="94" text-anchor="middle" font-size="9" fill="#3d4f6e">:8000</text>
+      </g>
+
+      <!-- LocalStack SQS (center-bottom) -->
+      <g transform="translate(330,420)">
+        <rect width="140" height="90" rx="12" fill="#ffd43b" fill-opacity=".1" stroke="#ffd43b" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="70" y="26" text-anchor="middle" font-size="18">📨</text>
+        <text x="70" y="46" text-anchor="middle" font-size="11" fill="#ffd43b" font-weight="700">LocalStack SQS</text>
+        <text x="70" y="62" text-anchor="middle" font-size="9" fill="#6b7a99">event-driven ns</text>
+        <text x="70" y="76" text-anchor="middle" font-size="9" fill="#6b7a99">db-migration-queue</text>
+        <text x="70" y="88" text-anchor="middle" font-size="9" fill="#3d4f6e">:4566</text>
+      </g>
+
+      <!-- KEDA (center-right-bottom) -->
+      <g transform="translate(540,420)">
+        <rect width="130" height="90" rx="12" fill="#56d4a0" fill-opacity=".08" stroke="#56d4a0" stroke-width="1.5" filter="url(#shadow)"/>
+        <text x="65" y="26" text-anchor="middle" font-size="18">⚡</text>
+        <text x="65" y="46" text-anchor="middle" font-size="11" fill="#56d4a0" font-weight="700">KEDA</text>
+        <text x="65" y="62" text-anchor="middle" font-size="9" fill="#6b7a99">keda ns</text>
+        <text x="65" y="76" text-anchor="middle" font-size="9" fill="#6b7a99">ScaledJob</text>
+        <text x="65" y="88" text-anchor="middle" font-size="9" fill="#3d4f6e">poll :15s</text>
+      </g>
+
+      <!-- Migration Job (bottom-right) -->
+      <g transform="translate(730,420)">
+        <rect width="140" height="90" rx="12" fill="#56d4a0" fill-opacity=".06" stroke="#56d4a0" stroke-width="1" filter="url(#shadow)"/>
+        <text x="70" y="26" text-anchor="middle" font-size="18">🗄</text>
+        <text x="70" y="46" text-anchor="middle" font-size="11" fill="#56d4a0" font-weight="700">Migration Job</text>
+        <text x="70" y="62" text-anchor="middle" font-size="9" fill="#6b7a99">event-driven ns</text>
+        <text x="70" y="76" text-anchor="middle" font-size="9" fill="#6b7a99">aws-cli:2.15</text>
+        <text x="70" y="88" text-anchor="middle" font-size="9" fill="#3d4f6e">apply + del msg</text>
+      </g>
+
+      <!-- Istio (decorative, bottom-center) -->
+      <g transform="translate(330,250)">
+        <rect width="130" height="80" rx="12" fill="#7c83ff" fill-opacity=".07" stroke="#7c83ff" stroke-width="1" stroke-dasharray="4,2"/>
+        <text x="65" y="26" text-anchor="middle" font-size="18">🕸</text>
+        <text x="65" y="46" text-anchor="middle" font-size="11" fill="#7c83ff" font-weight="700">Istio Ambient</text>
+        <text x="65" y="62" text-anchor="middle" font-size="9" fill="#6b7a99">ztunnel + Waypoint</text>
+        <text x="65" y="74" text-anchor="middle" font-size="9" fill="#6b7a99">mTLS STRICT</text>
+      </g>
+
+      <!-- ===== EDGES ===== -->
+
+      <!-- Client → Go API -->
+      <line x1="180" y1="95" x2="265" y2="220" stroke="#00aed8" stroke-width="2" marker-end="url(#m-go)"/>
+      <rect x="175" y="138" width="60" height="18" rx="3" fill="rgba(0,174,216,.1)"/>
+      <text x="205" y="151" text-anchor="middle" font-size="9" fill="#00aed8">HTTP :8080</text>
+
+      <!-- Go API → OTLP Collector -->
+      <line x1="410" y1="220" x2="490" y2="130" stroke="#ffa94d" stroke-width="1.5" stroke-dasharray="5,2" marker-end="url(#m-otel)"/>
+      <rect x="415" y="155" width="68" height="18" rx="3" fill="rgba(255,169,77,.1)"/>
+      <text x="449" y="168" text-anchor="middle" font-size="9" fill="#ffa94d">gRPC OTLP</text>
+
+      <!-- OTLP → Jaeger -->
+      <line x1="620" y1="100" x2="705" y2="100" stroke="#ffa94d" stroke-width="1.5" marker-end="url(#m-otel)"/>
+      <text x="662" y="93" text-anchor="middle" font-size="9" fill="#ffa94d">Jaeger gRPC</text>
+
+      <!-- Go API → Sandbox Job (K8s API) -->
+      <line x1="410" y1="240" x2="705" y2="250" stroke="#ff6b9d" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#m-red)"/>
+      <rect x="510" y="228" width="80" height="18" rx="3" fill="rgba(255,107,157,.08)"/>
+      <text x="550" y="241" text-anchor="middle" font-size="9" fill="#ff6b9d">K8s Job API</text>
+
+      <!-- Go API ↔ Istio (Ambient) -->
+      <line x1="335" y1="280" x2="310" y2="280" stroke="#7c83ff" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#m-go)"/>
+      <line x1="260" y1="250" x2="335" y2="260" stroke="#7c83ff" stroke-width="1" stroke-dasharray="3,2"/>
+
+      <!-- Django → OTLP -->
+      <path d="M135 380 Q135 160 485 140" stroke="#ffd43b" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#m-py)"/>
+      <text x="230" y="240" text-anchor="middle" font-size="9" fill="#ffd43b">OTLP traces</text>
+
+      <!-- Django → LocalStack SQS -->
+      <line x1="210" y1="430" x2="335" y2="460" stroke="#ffd43b" stroke-width="2" marker-end="url(#m-py)"/>
+      <rect x="240" y="430" width="56" height="18" rx="3" fill="rgba(255,212,59,.1)"/>
+      <text x="268" y="443" text-anchor="middle" font-size="9" fill="#ffd43b">boto3 SQS</text>
+
+      <!-- LocalStack SQS → KEDA (poll) -->
+      <line x1="470" y1="464" x2="545" y2="464" stroke="#56d4a0" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#m-keda)"/>
+      <text x="507" y="454" text-anchor="middle" font-size="9" fill="#56d4a0">poll depth</text>
+
+      <!-- KEDA → Migration Job -->
+      <line x1="670" y1="464" x2="735" y2="464" stroke="#56d4a0" stroke-width="2" marker-end="url(#m-keda)"/>
+      <text x="702" y="454" text-anchor="middle" font-size="9" fill="#56d4a0">spawn</text>
+
+      <!-- Migration Job → LocalStack SQS (delete msg) -->
+      <path d="M730 510 Q600 560 470 510" stroke="#56d4a0" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#m-keda)"/>
+      <text x="600" y="558" text-anchor="middle" font-size="9" fill="#56d4a0">delete message</text>
+
+      <!-- Client → Django -->
+      <line x1="90" y1="130" x2="110" y2="385" stroke="#ffd43b" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#m-py)"/>
+      <text x="70" y="280" text-anchor="middle" font-size="9" fill="#ffd43b">HTTP</text>
+      <text x="70" y="292" text-anchor="middle" font-size="9" fill="#ffd43b">:8000</text>
+
+      <!-- Legend -->
+      <g transform="translate(20,556)">
+        <text x="0" y="12" font-size="9" fill="#6b7a99">Legend:</text>
+        <line x1="55" y1="8" x2="80" y2="8" stroke="#00aed8" stroke-width="2" marker-end="url(#m-go)"/>
+        <text x="85" y="12" font-size="9" fill="#6b7a99">HTTP</text>
+        <line x1="120" y1="8" x2="145" y2="8" stroke="#ffa94d" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#m-otel)"/>
+        <text x="150" y="12" font-size="9" fill="#6b7a99">gRPC/OTLP</text>
+        <line x1="210" y1="8" x2="235" y2="8" stroke="#56d4a0" stroke-width="2" marker-end="url(#m-keda)"/>
+        <text x="240" y="12" font-size="9" fill="#6b7a99">KEDA trigger</text>
+        <line x1="310" y1="8" x2="335" y2="8" stroke="#ffd43b" stroke-width="2" marker-end="url(#m-py)"/>
+        <text x="340" y="12" font-size="9" fill="#6b7a99">boto3 SQS</text>
+        <line x1="400" y1="8" x2="425" y2="8" stroke="#ff6b9d" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#m-red)"/>
+        <text x="430" y="12" font-size="9" fill="#6b7a99">K8s Job API</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- ===== API REFERENCE ===== -->
+<section id="apis">
+  <h2>📡 API エンドポイント一覧</h2>
+  <div class="api-grid">
+
+    <!-- Go API -->
+    <div class="api-card" style="border-left:3px solid var(--go)">
+      <h4>🐹 Go Backend API <small style="color:var(--muted);font-weight:400">localhost:8080</small></h4>
+      <ul class="endpoint-list">
+        <li>
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/healthz</span>
+          <span class="ep-desc">liveness / readiness probe</span>
+        </li>
+        <li>
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/api/recommend</span>
+          <span class="ep-desc">Header: X-Region (JP/TW/KR)</span>
+        </li>
+        <li>
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/api/execute</span>
+          <span class="ep-desc">Body: {"command":"..."} → Sandbox Job</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Django API -->
+    <div class="api-card" style="border-left:3px solid var(--py)">
+      <h4>🐍 Django Migration API <small style="color:var(--muted);font-weight:400">localhost:8000</small></h4>
+      <ul class="endpoint-list">
+        <li>
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/healthz</span>
+          <span class="ep-desc">ヘルスチェック</span>
+        </li>
+        <li>
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/api/migration/trigger</span>
+          <span class="ep-desc">マイグレーション直接実行 + OTLP spans</span>
+        </li>
+        <li>
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/api/migration/send-event</span>
+          <span class="ep-desc">SQS にイベント送信 → KEDA 起動</span>
+        </li>
+        <li>
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/api/migration/status</span>
+          <span class="ep-desc">SQS queue depth 確認</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- OTLP Collector -->
+    <div class="api-card" style="border-left:3px solid var(--otel)">
+      <h4>📡 OTLP Collector <small style="color:var(--muted);font-weight:400">:4317 / :4318</small></h4>
+      <ul class="endpoint-list">
+        <li>
+          <span class="method method-post" style="background:rgba(0,174,216,.1);color:var(--go);border-color:rgba(0,174,216,.3)">gRPC</span>
+          <span class="ep-path">:4317</span>
+          <span class="ep-desc">OTLP gRPC receiver (Go / Django)</span>
+        </li>
+        <li>
+          <span class="method method-post">HTTP</span>
+          <span class="ep-path">:4318</span>
+          <span class="ep-desc">OTLP HTTP receiver</span>
+        </li>
+        <li>
+          <span class="method method-get">GET</span>
+          <span class="ep-path">:8888/metrics</span>
+          <span class="ep-desc">Collector 自身のメトリクス</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- LocalStack SQS -->
+    <div class="api-card" style="border-left:3px solid var(--py)">
+      <h4>📨 LocalStack SQS <small style="color:var(--muted);font-weight:400">:4566</small></h4>
+      <ul class="endpoint-list">
+        <li>
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/?Action=SendMessage</span>
+          <span class="ep-desc">メッセージ送信 (boto3)</span>
+        </li>
+        <li>
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/?Action=ReceiveMessage</span>
+          <span class="ep-desc">KEDA が定期ポーリング</span>
+        </li>
+        <li>
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/?Action=DeleteMessage</span>
+          <span class="ep-desc">Migration Job 完了後に削除</span>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== DEPENDENCY TABLE ===== -->
+<section id="deptable">
+  <h2>🔗 サービス間依存関係</h2>
+  <table class="dep-table">
+    <thead>
+      <tr><th>FROM</th><th>TO</th><th>エンドポイント</th><th>プロトコル / 用途</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Client</td>
+        <td>Go API</td>
+        <td>localhost:8080</td>
+        <td><span class="badge-proto bp-http">HTTP/1.1</span>port-forward or NodePort</td>
+      </tr>
+      <tr>
+        <td>Go API</td>
+        <td>OTLP Collector</td>
+        <td>otel-collector.observability:4317</td>
+        <td><span class="badge-proto bp-grpc">gRPC</span>OTLP トレース送信</td>
+      </tr>
+      <tr>
+        <td>Go API</td>
+        <td>Sandbox Job</td>
+        <td>kubernetes.default.svc</td>
+        <td><span class="badge-proto bp-k8s">K8s API</span>batch/Job 動的生成</td>
+      </tr>
+      <tr>
+        <td>Django API</td>
+        <td>OTLP Collector</td>
+        <td>otel-collector.observability:4317</td>
+        <td><span class="badge-proto bp-grpc">gRPC</span>マイグレーション spans</td>
+      </tr>
+      <tr>
+        <td>Django API</td>
+        <td>LocalStack SQS</td>
+        <td>localstack.event-driven:4566</td>
+        <td><span class="badge-proto bp-sqs">SQS API</span>boto3 send_message</td>
+      </tr>
+      <tr>
+        <td>KEDA</td>
+        <td>LocalStack SQS</td>
+        <td>localstack.event-driven:4566</td>
+        <td><span class="badge-proto bp-sqs">SQS API</span>queue depth ポーリング (15s)</td>
+      </tr>
+      <tr>
+        <td>KEDA</td>
+        <td>Migration Job</td>
+        <td>kubernetes.default.svc</td>
+        <td><span class="badge-proto bp-k8s">K8s API</span>ScaledJob → Job 生成</td>
+      </tr>
+      <tr>
+        <td>OTLP Collector</td>
+        <td>Jaeger</td>
+        <td>jaeger-collector.observability:14250</td>
+        <td><span class="badge-proto bp-grpc">gRPC</span>Jaeger exporter</td>
+      </tr>
+      <tr>
+        <td>Migration Job</td>
+        <td>LocalStack SQS</td>
+        <td>localstack.event-driven:4566</td>
+        <td><span class="badge-proto bp-sqs">SQS API</span>処理完了後 delete_message</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ===== TECH STACK ===== -->
+<section id="techstack">
+  <h2>🛠 技術スタック詳細</h2>
+  <div class="svg-wrap">
+    <svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,sans-serif">
+      <defs>
+        <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#07090f"/>
+        </linearGradient>
+      </defs>
+      <rect width="900" height="300" fill="url(#sg)"/>
+
+      <!-- Layer labels -->
+      <text x="10" y="50" font-size="10" fill="#3d4f6e" font-weight="700">APPLICATION</text>
+      <text x="10" y="120" font-size="10" fill="#3d4f6e" font-weight="700">PLATFORM</text>
+      <text x="10" y="190" font-size="10" fill="#3d4f6e" font-weight="700">INFRA</text>
+      <text x="10" y="260" font-size="10" fill="#3d4f6e" font-weight="700">HOST</text>
+
+      <!-- Horizontal dividers -->
+      <line x1="90" y1="65" x2="890" y2="65" stroke="#21293d" stroke-width="1"/>
+      <line x1="90" y1="140" x2="890" y2="140" stroke="#21293d" stroke-width="1"/>
+      <line x1="90" y1="210" x2="890" y2="210" stroke="#21293d" stroke-width="1"/>
+
+      <!-- Application Layer -->
+      <g transform="translate(100,30)">
+        <rect width="120" height="30" rx="6" fill="#00aed8" fill-opacity=".15" stroke="#00aed8" stroke-width="1"/>
+        <text x="60" y="20" text-anchor="middle" font-size="10" fill="#00aed8" font-weight="700">Go 1.22</text>
+      </g>
+      <g transform="translate(240,30)">
+        <rect width="130" height="30" rx="6" fill="#ffd43b" fill-opacity=".12" stroke="#ffd43b" stroke-width="1"/>
+        <text x="65" y="20" text-anchor="middle" font-size="10" fill="#ffd43b" font-weight="700">Django 5 + DRF</text>
+      </g>
+      <g transform="translate(390,30)">
+        <rect width="150" height="30" rx="6" fill="#ffa94d" fill-opacity=".12" stroke="#ffa94d" stroke-width="1"/>
+        <text x="75" y="20" text-anchor="middle" font-size="10" fill="#ffa94d" font-weight="700">OpenTelemetry 1.24</text>
+      </g>
+      <g transform="translate(560,30)">
+        <rect width="110" height="30" rx="6" fill="#ffd43b" fill-opacity=".1" stroke="#ffd43b" stroke-width="1"/>
+        <text x="55" y="20" text-anchor="middle" font-size="10" fill="#ffd43b" font-weight="700">boto3 (SQS)</text>
+      </g>
+      <g transform="translate(690,30)">
+        <rect width="120" height="30" rx="6" fill="#00aed8" fill-opacity=".1" stroke="#00aed8" stroke-width="1"/>
+        <text x="60" y="20" text-anchor="middle" font-size="10" fill="#00aed8" font-weight="700">client-go v0.29</text>
+      </g>
+
+      <!-- Platform Layer -->
+      <g transform="translate(100,100)">
+        <rect width="120" height="30" rx="6" fill="#7c83ff" fill-opacity=".15" stroke="#7c83ff" stroke-width="1"/>
+        <text x="60" y="20" text-anchor="middle" font-size="10" fill="#7c83ff" font-weight="700">Istio 1.21 Ambient</text>
+      </g>
+      <g transform="translate(240,100)">
+        <rect width="110" height="30" rx="6" fill="#56d4a0" fill-opacity=".12" stroke="#56d4a0" stroke-width="1"/>
+        <text x="55" y="20" text-anchor="middle" font-size="10" fill="#56d4a0" font-weight="700">KEDA 2.14</text>
+      </g>
+      <g transform="translate(370,100)">
+        <rect width="150" height="30" rx="6" fill="#ffa94d" fill-opacity=".1" stroke="#ffa94d" stroke-width="1"/>
+        <text x="75" y="20" text-anchor="middle" font-size="10" fill="#ffa94d" font-weight="700">OTLP Collector 0.97</text>
+      </g>
+      <g transform="translate(540,100)">
+        <rect width="120" height="30" rx="6" fill="#ffa94d" fill-opacity=".08" stroke="#ffa94d" stroke-width="1"/>
+        <text x="60" y="20" text-anchor="middle" font-size="10" fill="#ffa94d" font-weight="700">Jaeger 1.56</text>
+      </g>
+      <g transform="translate(680,100)">
+        <rect width="130" height="30" rx="6" fill="#ffd43b" fill-opacity=".1" stroke="#ffd43b" stroke-width="1"/>
+        <text x="65" y="20" text-anchor="middle" font-size="10" fill="#ffd43b" font-weight="700">LocalStack 3.4</text>
+      </g>
+
+      <!-- Infra Layer -->
+      <g transform="translate(100,170)">
+        <rect width="130" height="30" rx="6" fill="#326ce5" fill-opacity=".15" stroke="#326ce5" stroke-width="1"/>
+        <text x="65" y="20" text-anchor="middle" font-size="10" fill="#326ce5" font-weight="700">Kubernetes 1.29</text>
+      </g>
+      <g transform="translate(250,170)">
+        <rect width="100" height="30" rx="6" fill="#326ce5" fill-opacity=".1" stroke="#326ce5" stroke-width="1"/>
+        <text x="50" y="20" text-anchor="middle" font-size="10" fill="#326ce5" font-weight="700">Kind 0.22</text>
+      </g>
+      <g transform="translate(370,170)">
+        <rect width="90" height="30" rx="6" fill="#21293d" stroke="#3d4f6e" stroke-width="1"/>
+        <text x="45" y="20" text-anchor="middle" font-size="10" fill="#cdd9f0" font-weight="700">Helm 3.14</text>
+      </g>
+      <g transform="translate(480,170)">
+        <rect width="160" height="30" rx="6" fill="#326ce5" fill-opacity=".08" stroke="#326ce5" stroke-width="1"/>
+        <text x="80" y="20" text-anchor="middle" font-size="10" fill="#326ce5" font-weight="700">Gateway API v1.1</text>
+      </g>
+
+      <!-- Host Layer -->
+      <g transform="translate(100,240)">
+        <rect width="100" height="30" rx="6" fill="#21293d" stroke="#3d4f6e" stroke-width="1"/>
+        <text x="50" y="20" text-anchor="middle" font-size="10" fill="#cdd9f0" font-weight="700">WSL2 / Linux</text>
+      </g>
+      <g transform="translate(220,240)">
+        <rect width="90" height="30" rx="6" fill="#21293d" stroke="#3d4f6e" stroke-width="1"/>
+        <text x="45" y="20" text-anchor="middle" font-size="10" fill="#cdd9f0" font-weight="700">Docker Desktop</text>
+      </g>
+      <g transform="translate(330,240)">
+        <rect width="100" height="30" rx="6" fill="#21293d" stroke="#3d4f6e" stroke-width="1"/>
+        <text x="50" y="20" text-anchor="middle" font-size="10" fill="#cdd9f0" font-weight="700">Windows 11</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+</main>
+<footer>Cloud Native AI Agent Infra PoC — Service Map</footer>
+</body>
+</html>

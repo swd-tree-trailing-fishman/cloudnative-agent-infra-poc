@@ -1,0 +1,28 @@
+# Go
+/agent-server
+*.exe
+vendor/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+db.sqlite3
+
+# Kind (generated at runtime)
+kind-config.yaml
+
+# Secrets / local overrides
+.env
+*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

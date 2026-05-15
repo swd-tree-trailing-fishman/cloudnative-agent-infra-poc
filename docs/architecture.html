@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Architecture — Cloud Native AI Agent Infra</title>
+<style>
+:root {
+  --bg: #07090f;
+  --surface: #0d1117;
+  --card: #161b27;
+  --border: #21293d;
+  --border-hi: #3d4f6e;
+  --text: #cdd9f0;
+  --muted: #6b7a99;
+  --go: #00aed8;
+  --python: #ffd43b;
+  --k8s: #326ce5;
+  --istio: #7c83ff;
+  --keda: #56d4a0;
+  --otel: #ffa94d;
+  --red: #ff6b9d;
+  --white: #ffffff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ---- NAV ---- */
+nav{display:flex;align-items:center;gap:1.5rem;padding:.8rem 2rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+nav .logo{font-weight:700;font-size:1rem;color:var(--istio);white-space:nowrap}
+nav a{color:var(--muted);text-decoration:none;font-size:.85rem;padding:.3rem .7rem;border-radius:6px;transition:.2s}
+nav a:hover,nav a.active{background:var(--card);color:var(--text)}
+
+/* ---- HERO ---- */
+.hero{text-align:center;padding:3rem 2rem 2rem;border-bottom:1px solid var(--border)}
+.hero h1{font-size:2rem;font-weight:700;background:linear-gradient(90deg,var(--istio),var(--keda));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--muted);margin-top:.5rem;font-size:.95rem}
+
+/* ---- MAIN ---- */
+main{max-width:1200px;margin:0 auto;padding:2rem 1.5rem 5rem}
+section{margin-bottom:4rem}
+h2{font-size:1.4rem;color:var(--istio);margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+h3{font-size:1rem;color:var(--keda);margin:1.5rem 0 .8rem}
+
+/* ---- LAYER DIAGRAM ---- */
+.layer-diagram{position:relative;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.layer-diagram svg{display:block;width:100%;height:auto}
+
+/* ---- COMPONENT GRID ---- */
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}
+.comp-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.2rem;transition:.2s;cursor:default}
+.comp-card:hover{border-color:var(--border-hi);transform:translateY(-2px)}
+.comp-card .chip{display:inline-block;font-size:.7rem;padding:.15rem .5rem;border-radius:999px;font-weight:600;margin-bottom:.5rem}
+.comp-card h4{font-size:.9rem;margin-bottom:.3rem}
+.comp-card p{font-size:.8rem;color:var(--muted);line-height:1.5}
+
+.chip-go{background:rgba(0,174,216,.15);color:var(--go);border:1px solid rgba(0,174,216,.3)}
+.chip-py{background:rgba(255,212,59,.1);color:var(--python);border:1px solid rgba(255,212,59,.3)}
+.chip-k8s{background:rgba(50,108,229,.15);color:var(--k8s);border:1px solid rgba(50,108,229,.3)}
+.chip-istio{background:rgba(124,131,255,.15);color:var(--istio);border:1px solid rgba(124,131,255,.3)}
+.chip-keda{background:rgba(86,212,160,.12);color:var(--keda);border:1px solid rgba(86,212,160,.3)}
+.chip-otel{background:rgba(255,169,77,.12);color:var(--otel);border:1px solid rgba(255,169,77,.3)}
+
+/* ---- LEGEND ---- */
+.legend{display:flex;flex-wrap:wrap;gap:.6rem;margin:1rem 0}
+.legend-item{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted)}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+
+/* ---- FLOW STEPS ---- */
+.flow-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1rem 0}
+.flow-node{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.5rem 1rem;font-size:.82rem;white-space:nowrap}
+.flow-arrow{color:var(--muted);font-size:1.2rem}
+
+/* ---- MERMAID ---- */
+.mermaid-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin:1rem 0;overflow-x:auto}
+.mermaid{min-width:400px}
+
+/* ---- TABLE ---- */
+.info-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.info-table th,.info-table td{border:1px solid var(--border);padding:.6rem .9rem;text-align:left}
+.info-table th{background:var(--card);color:var(--istio)}
+.info-table td:first-child{font-family:monospace;color:var(--otel)}
+
+footer{text-align:center;padding:2rem;border-top:1px solid var(--border);color:var(--muted);font-size:.82rem}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">☸ Cloud Native PoC</span>
+  <a href="index.html">概要</a>
+  <a href="architecture.html" class="active">🏗 Architecture</a>
+  <a href="network.html">🕸 Network</a>
+  <a href="services.html">🔗 Services</a>
+</nav>
+
+<div class="hero">
+  <h1>🏗 インフラ・アプリケーション構成図</h1>
+  <p>WSL2 → Kind → Namespace → Pod までの全レイヤーを可視化</p>
+</div>
+
+<main>
+
+<!-- ===== LAYER SVG DIAGRAM ===== -->
+<section id="layers">
+  <h2>📐 インフラ レイヤー図</h2>
+
+  <div class="layer-diagram">
+    <svg viewBox="0 0 1000 680" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,sans-serif">
+      <defs>
+        <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0d1117"/>
+          <stop offset="100%" stop-color="#07090f"/>
+        </linearGradient>
+        <linearGradient id="gGo" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#00aed8" stop-opacity=".25"/>
+          <stop offset="100%" stop-color="#00aed8" stop-opacity=".05"/>
+        </linearGradient>
+        <linearGradient id="gPy" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ffd43b" stop-opacity=".2"/>
+          <stop offset="100%" stop-color="#ffd43b" stop-opacity=".04"/>
+        </linearGradient>
+        <linearGradient id="gObs" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ffa94d" stop-opacity=".2"/>
+          <stop offset="100%" stop-color="#ffa94d" stop-opacity=".04"/>
+        </linearGradient>
+        <linearGradient id="gSbx" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ff6b9d" stop-opacity=".18"/>
+          <stop offset="100%" stop-color="#ff6b9d" stop-opacity=".04"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6b7a99"/>
+        </marker>
+        <marker id="arrow-go" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#00aed8"/>
+        </marker>
+        <marker id="arrow-otel" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#ffa94d"/>
+        </marker>
+        <marker id="arrow-keda" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#56d4a0"/>
+        </marker>
+      </defs>
+
+      <!-- Background -->
+      <rect width="1000" height="680" fill="url(#gBg)"/>
+
+      <!-- ===== Layer 0: WSL2 Host ===== -->
+      <rect x="20" y="20" width="960" height="640" rx="14" fill="none" stroke="#21293d" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="36" y="44" font-size="13" fill="#3d4f6e" font-weight="600">WSL2 Host</text>
+
+      <!-- ===== Layer 1: Kind Cluster ===== -->
+      <rect x="40" y="56" width="920" height="588" rx="12" fill="none" stroke="#326ce5" stroke-width="1.5" stroke-dasharray="5,3" opacity=".6"/>
+      <rect x="40" y="56" width="920" height="25" rx="12" fill="#326ce5" fill-opacity=".12"/>
+      <text x="56" y="73" font-size="12" fill="#326ce5" font-weight="700">☸ Kind Cluster — agent-poc</text>
+
+      <!-- ===== Namespace: agent-infra ===== -->
+      <rect x="58" y="96" width="290" height="320" rx="10" fill="url(#gGo)" stroke="#00aed8" stroke-width="1" stroke-opacity=".5"/>
+      <text x="74" y="116" font-size="11" fill="#00aed8" font-weight="700">📦 agent-infra</text>
+      <text x="74" y="130" font-size="9" fill="#6b7a99">Istio Ambient: ON</text>
+
+      <!-- Go API Pod -->
+      <rect x="74" y="142" width="258" height="130" rx="8" fill="#00aed8" fill-opacity=".1" stroke="#00aed8" stroke-width="1" stroke-opacity=".4"/>
+      <text x="90" y="162" font-size="11" fill="#00aed8" font-weight="700">🐹 Go API — Deployment x2</text>
+      <text x="90" y="180" font-size="10" fill="#6b7a99">image: agent-backend:latest</text>
+      <text x="90" y="196" font-size="10" fill="#cdd9f0">▸ GET  /api/recommend</text>
+      <text x="90" y="210" font-size="10" fill="#cdd9f0">▸ POST /api/execute</text>
+      <text x="90" y="224" font-size="10" fill="#cdd9f0">▸ GET  /healthz</text>
+      <text x="90" y="242" font-size="9" fill="#6b7a99">Port: 8080  |  Replicas: 2</text>
+      <text x="90" y="256" font-size="9" fill="#6b7a99">readOnlyRootFilesystem: true</text>
+
+      <!-- ConfigMap -->
+      <rect x="74" y="286" width="120" height="60" rx="6" fill="#21293d" stroke="#3d4f6e" stroke-width="1"/>
+      <text x="84" y="303" font-size="10" fill="#6b7a99">ConfigMap</text>
+      <text x="84" y="317" font-size="9" fill="#cdd9f0">FEATURE_* flags</text>
+      <text x="84" y="331" font-size="9" fill="#cdd9f0">OTEL_ENDPOINT</text>
+      <text x="84" y="342" font-size="9" fill="#cdd9f0">SANDBOX_NAMESPACE</text>
+
+      <!-- ServiceAccount + RBAC -->
+      <rect x="206" y="286" width="126" height="60" rx="6" fill="#21293d" stroke="#3d4f6e" stroke-width="1"/>
+      <text x="216" y="303" font-size="10" fill="#6b7a99">ServiceAccount</text>
+      <text x="216" y="317" font-size="9" fill="#cdd9f0">agent-backend</text>
+      <text x="216" y="332" font-size="9" fill="#6b7a99">RBAC → batch/jobs</text>
+      <text x="216" y="346" font-size="9" fill="#6b7a99">create in sandbox ns</text>
+
+      <!-- AuthPolicy label -->
+      <rect x="74" y="360" width="258" height="40" rx="6" fill="#7c83ff" fill-opacity=".08" stroke="#7c83ff" stroke-width="1" stroke-opacity=".3"/>
+      <text x="90" y="378" font-size="10" fill="#7c83ff">AuthorizationPolicy (Istio) — ALLOW GET/POST :8080</text>
+      <text x="90" y="392" font-size="9" fill="#6b7a99">src.namespaces: [agent-infra, istio-system]</text>
+
+      <!-- ===== Namespace: observability ===== -->
+      <rect x="366" y="96" width="280" height="320" rx="10" fill="url(#gObs)" stroke="#ffa94d" stroke-width="1" stroke-opacity=".5"/>
+      <text x="382" y="116" font-size="11" fill="#ffa94d" font-weight="700">🔭 observability</text>
+
+      <!-- OTLP Collector -->
+      <rect x="382" y="132" width="248" height="110" rx="8" fill="#ffa94d" fill-opacity=".1" stroke="#ffa94d" stroke-width="1" stroke-opacity=".4"/>
+      <text x="398" y="152" font-size="11" fill="#ffa94d" font-weight="700">OTLP Collector</text>
+      <text x="398" y="168" font-size="10" fill="#6b7a99">otel/opentelemetry-collector-contrib</text>
+      <text x="398" y="184" font-size="10" fill="#cdd9f0">▸ gRPC :4317  (receiver)</text>
+      <text x="398" y="198" font-size="10" fill="#cdd9f0">▸ HTTP :4318  (receiver)</text>
+      <text x="398" y="214" font-size="10" fill="#cdd9f0">▸ :8888        (metrics)</text>
+      <text x="398" y="230" font-size="9" fill="#6b7a99">processors: batch, memory_limiter</text>
+
+      <!-- Jaeger -->
+      <rect x="382" y="256" width="248" height="110" rx="8" fill="#ffa94d" fill-opacity=".08" stroke="#ffa94d" stroke-width="1" stroke-opacity=".3"/>
+      <text x="398" y="276" font-size="11" fill="#ffa94d" font-weight="700">Jaeger all-in-one</text>
+      <text x="398" y="292" font-size="10" fill="#6b7a99">jaegertracing/all-in-one:1.56</text>
+      <text x="398" y="308" font-size="10" fill="#cdd9f0">▸ UI  :16686  (NodePort 30686)</text>
+      <text x="398" y="322" font-size="10" fill="#cdd9f0">▸ gRPC :14250 (collector)</text>
+      <text x="398" y="338" font-size="9" fill="#6b7a99">SPAN_STORAGE_TYPE: memory</text>
+      <text x="398" y="352" font-size="9" fill="#6b7a99">localhost:16686 でアクセス可能</text>
+
+      <!-- ===== Namespace: event-driven ===== -->
+      <rect x="58" y="432" width="400" height="190" rx="10" fill="url(#gPy)" stroke="#ffd43b" stroke-width="1" stroke-opacity=".5"/>
+      <text x="74" y="452" font-size="11" fill="#ffd43b" font-weight="700">⚡ event-driven</text>
+
+      <!-- LocalStack -->
+      <rect x="74" y="466" width="170" height="90" rx="8" fill="#ffd43b" fill-opacity=".08" stroke="#ffd43b" stroke-width="1" stroke-opacity=".4"/>
+      <text x="90" y="484" font-size="11" fill="#ffd43b" font-weight="700">LocalStack SQS</text>
+      <text x="90" y="500" font-size="10" fill="#6b7a99">localstack/localstack:3.4</text>
+      <text x="90" y="514" font-size="10" fill="#cdd9f0">▸ :4566 (SQS endpoint)</text>
+      <text x="90" y="528" font-size="9" fill="#6b7a99">queue: db-migration-queue</text>
+      <text x="90" y="542" font-size="9" fill="#6b7a99">region: ap-northeast-1</text>
+
+      <!-- KEDA ScaledJob -->
+      <rect x="258" y="466" width="186" height="90" rx="8" fill="#56d4a0" fill-opacity=".08" stroke="#56d4a0" stroke-width="1" stroke-opacity=".4"/>
+      <text x="274" y="484" font-size="11" fill="#56d4a0" font-weight="700">KEDA ScaledJob</text>
+      <text x="274" y="500" font-size="10" fill="#6b7a99">db-migration-scaledjob</text>
+      <text x="274" y="514" font-size="10" fill="#cdd9f0">▸ pollingInterval: 15s</text>
+      <text x="274" y="528" font-size="10" fill="#cdd9f0">▸ maxReplicas: 5</text>
+      <text x="274" y="542" font-size="9" fill="#6b7a99">trigger: aws-sqs-queue</text>
+
+      <!-- Django -->
+      <rect x="74" y="566" width="370" height="40" rx="6" fill="#ffd43b" fill-opacity=".1" stroke="#ffd43b" stroke-width="1" stroke-opacity=".3"/>
+      <text x="90" y="582" font-size="10" fill="#ffd43b" font-weight="700">🐍 Django Migration Service</text>
+      <text x="90" y="596" font-size="9" fill="#6b7a99">POST /api/migration/send-event → boto3 → LocalStack SQS</text>
+
+      <!-- ===== Namespace: agent-sandbox ===== -->
+      <rect x="476" y="432" width="240" height="190" rx="10" fill="url(#gSbx)" stroke="#ff6b9d" stroke-width="1" stroke-opacity=".5"/>
+      <text x="492" y="452" font-size="11" fill="#ff6b9d" font-weight="700">🔒 agent-sandbox</text>
+      <text x="492" y="466" font-size="9" fill="#6b7a99">Istio Ambient: OFF</text>
+
+      <rect x="492" y="476" width="208" height="130" rx="8" fill="#ff6b9d" fill-opacity=".06" stroke="#ff6b9d" stroke-width="1" stroke-opacity=".3"/>
+      <text x="508" y="494" font-size="11" fill="#ff6b9d" font-weight="700">ephemeral Job</text>
+      <text x="508" y="510" font-size="10" fill="#6b7a99">sandbox-job-{timestamp}</text>
+      <text x="508" y="526" font-size="10" fill="#cdd9f0">image: busybox:1.36</text>
+      <text x="508" y="542" font-size="9" fill="#6b7a99">✅ readOnlyRootFilesystem</text>
+      <text x="508" y="556" font-size="9" fill="#6b7a99">✅ runAsNonRoot (65534)</text>
+      <text x="508" y="570" font-size="9" fill="#6b7a99">✅ allowPrivilegeEscalation:false</text>
+      <text x="508" y="584" font-size="9" fill="#ffa94d">⏱ TTL: 60s → auto-deleted</text>
+
+      <!-- ===== Namespace: istio-system ===== -->
+      <rect x="662" y="96" width="278" height="250" rx="10" fill="rgba(124,131,255,.06)" stroke="#7c83ff" stroke-width="1" stroke-opacity=".5"/>
+      <text x="678" y="116" font-size="11" fill="#7c83ff" font-weight="700">🕸 istio-system</text>
+
+      <!-- ztunnel -->
+      <rect x="678" y="130" width="246" height="90" rx="8" fill="#7c83ff" fill-opacity=".1" stroke="#7c83ff" stroke-width="1" stroke-opacity=".4"/>
+      <text x="694" y="150" font-size="11" fill="#7c83ff" font-weight="700">ztunnel (DaemonSet)</text>
+      <text x="694" y="166" font-size="10" fill="#6b7a99">L4 mTLS — Node per Pod</text>
+      <text x="694" y="182" font-size="10" fill="#cdd9f0">▸ HBONE tunnel (TCP:15008)</text>
+      <text x="694" y="196" font-size="9" fill="#6b7a99">PeerAuthentication: STRICT</text>
+      <text x="694" y="210" font-size="9" fill="#6b7a99">証明書: Istio CA 自動発行</text>
+
+      <!-- Waypoint -->
+      <rect x="678" y="234" width="246" height="100" rx="8" fill="#7c83ff" fill-opacity=".08" stroke="#7c83ff" stroke-width="1" stroke-opacity=".3"/>
+      <text x="694" y="254" font-size="11" fill="#7c83ff" font-weight="700">Waypoint Proxy</text>
+      <text x="694" y="270" font-size="10" fill="#6b7a99">L7 Policy — Gateway API</text>
+      <text x="694" y="286" font-size="10" fill="#cdd9f0">▸ VirtualService routing</text>
+      <text x="694" y="300" font-size="10" fill="#cdd9f0">▸ AuthorizationPolicy</text>
+      <text x="694" y="314" font-size="9" fill="#6b7a99">Port: HBONE :15008</text>
+
+      <!-- keda ns -->
+      <rect x="662" y="362" width="278" height="260" rx="10" fill="rgba(86,212,160,.05)" stroke="#56d4a0" stroke-width="1" stroke-opacity=".4"/>
+      <text x="678" y="382" font-size="11" fill="#56d4a0" font-weight="700">keda namespace</text>
+      <rect x="678" y="396" width="246" height="80" rx="8" fill="#56d4a0" fill-opacity=".06" stroke="#56d4a0" stroke-width="1" stroke-opacity=".3"/>
+      <text x="694" y="416" font-size="11" fill="#56d4a0" font-weight="700">KEDA Operator</text>
+      <text x="694" y="432" font-size="10" fill="#6b7a99">kedacore/keda:2.14</text>
+      <text x="694" y="448" font-size="10" fill="#cdd9f0">▸ ScaledJob controller</text>
+      <text x="694" y="464" font-size="9" fill="#6b7a99">SQS queue depth monitoring</text>
+
+      <rect x="678" y="488" width="246" height="120" rx="8" fill="#56d4a0" fill-opacity=".04" stroke="#56d4a0" stroke-width="1" stroke-opacity=".2"/>
+      <text x="694" y="508" font-size="10" fill="#56d4a0" font-weight="700">Migration Job (triggered)</text>
+      <text x="694" y="524" font-size="9" fill="#6b7a99">image: amazon/aws-cli:2.15.30</text>
+      <text x="694" y="540" font-size="9" fill="#cdd9f0">001_create_users_table ✓</text>
+      <text x="694" y="554" font-size="9" fill="#cdd9f0">002_add_agent_logs ✓</text>
+      <text x="694" y="568" font-size="9" fill="#cdd9f0">003_add_feature_flags ✓</text>
+      <text x="694" y="584" font-size="9" fill="#ffa94d">→ SQS message deleted</text>
+      <text x="694" y="598" font-size="9" fill="#6b7a99">successfulJobsHistoryLimit: 3</text>
+
+      <!-- ===== Arrows ===== -->
+      <!-- Client → Go API -->
+      <line x1="30" y1="207" x2="58" y2="207" stroke="#00aed8" stroke-width="1.5" marker-end="url(#arrow-go)"/>
+      <text x="5" y="200" font-size="9" fill="#00aed8">Client</text>
+      <text x="5" y="212" font-size="9" fill="#6b7a99">:8080</text>
+
+      <!-- Go API → OTLP -->
+      <line x1="332" y1="185" x2="366" y2="185" stroke="#ffa94d" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-otel)"/>
+      <text x="334" y="175" font-size="9" fill="#ffa94d">gRPC</text>
+      <text x="334" y="186" font-size="9" fill="#ffa94d">OTLP</text>
+
+      <!-- Go API → Sandbox -->
+      <path d="M203 416 L203 432 L596 432 L596 476" stroke="#ff6b9d" stroke-width="1.5" stroke-dasharray="4,2" fill="none" marker-end="url(#arrow)"/>
+      <text x="350" y="426" font-size="9" fill="#ff6b9d">K8s Job API</text>
+
+      <!-- OTLP → Jaeger -->
+      <line x1="506" y1="242" x2="506" y2="256" stroke="#ffa94d" stroke-width="1.5" marker-end="url(#arrow-otel)"/>
+
+      <!-- LocalStack → KEDA -->
+      <line x1="244" y1="510" x2="258" y2="510" stroke="#56d4a0" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrow-keda)"/>
+      <text x="235" y="505" font-size="8" fill="#56d4a0">poll</text>
+
+      <!-- Django → LocalStack -->
+      <line x1="200" y1="575" x2="200" y2="556" stroke="#ffd43b" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#arrow)"/>
+
+      <!-- KEDA ScaledJob → Migration Job -->
+      <path d="M444 510 L580 510 L662 540" stroke="#56d4a0" stroke-width="1.5" stroke-dasharray="4,2" fill="none" marker-end="url(#arrow-keda)"/>
+
+      <!-- Go API → istio -->
+      <path d="M348 207 L662 207" stroke="#7c83ff" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#arrow)"/>
+      <text x="490" y="200" font-size="9" fill="#7c83ff">Ambient mTLS</text>
+    </svg>
+  </div>
+
+  <div class="legend" style="margin-top:1rem">
+    <div class="legend-item"><div class="legend-dot" style="background:#00aed8"></div>Go / agent-infra</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffd43b"></div>Python / Django</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffa94d"></div>Observability (OTLP + Jaeger)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#56d4a0"></div>KEDA / Event-driven</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff6b9d"></div>Agent Sandbox</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7c83ff"></div>Istio Ambient</div>
+  </div>
+</section>
+
+<!-- ===== COMPONENTS ===== -->
+<section id="components">
+  <h2>🧩 コンポーネント一覧</h2>
+  <div class="comp-grid">
+    <div class="comp-card">
+      <span class="chip chip-go">Go 1.22</span>
+      <h4>🐹 Go Backend API</h4>
+      <p>Feature Toggle・OTLP計装・Sandbox Job生成を担うメインバックエンド。distroless イメージで本番同等のセキュリティ。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-py">Django 5</span>
+      <h4>🐍 Django Migration Service</h4>
+      <p>Python学習用サービス。boto3でLocalStack SQSにイベント送信、OpenTelemetryでマイグレーションステップを計装。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-otel">OTLP</span>
+      <h4>OTLP Collector</h4>
+      <p>gRPC :4317 でスパンを受信し、Jaegerにバッチ転送。memory_limiter でOOM防止。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-otel">Jaeger</span>
+      <h4>Jaeger UI</h4>
+      <p>分散トレースの可視化。localhost:16686 でウォーターフォール表示。SPAN_STORAGE_TYPE: memory (PoC用)。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-keda">KEDA 2.14</span>
+      <h4>KEDA Operator</h4>
+      <p>SQSキュー深さを15秒間隔でポーリング。queueLength≥1 で ScaledJob を起動。maxReplicas: 5 で並列実行。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-k8s">LocalStack</span>
+      <h4>LocalStack SQS</h4>
+      <p>本物のAWS SQS互換モック。db-migration-queue でイベントを受信・保持。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-istio">Istio 1.21</span>
+      <h4>ztunnel (DaemonSet)</h4>
+      <p>各NodeでL4 mTLSを自動処理。サイドカー不要でAmbient Mode。PeerAuthentication: STRICT。</p>
+    </div>
+    <div class="comp-card">
+      <span class="chip chip-istio">Waypoint</span>
+      <h4>Waypoint Proxy</h4>
+      <p>L7ポリシー (AuthorizationPolicy, VirtualService) を処理。X-Regionヘッダーによるルーティング。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== APP FLOW ===== -->
+<section id="appflow">
+  <h2>🔄 アプリケーションフロー</h2>
+  <h3>A. Feature Toggle フロー</h3>
+  <div class="flow-row">
+    <div class="flow-node" style="border-color:#00aed8;color:#00aed8">Client<br/><small>X-Region: JP</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node">Go API<br/><small>/api/recommend</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#7c83ff;color:#7c83ff">feature.Toggle<br/><small>ConfigForRegion()</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#ffa94d;color:#ffa94d">OTLP Span<br/><small>recommend.llm_call</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#56d4a0;color:#56d4a0">Response<br/><small>{"lang":"ja",...}</small></div>
+  </div>
+
+  <h3>B. Agent Sandbox フロー</h3>
+  <div class="flow-row">
+    <div class="flow-node" style="border-color:#00aed8;color:#00aed8">Client<br/><small>POST /api/execute</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node">sandbox.Runner<br/><small>Execute()</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#326ce5;color:#326ce5">K8s API<br/><small>batch/Job create</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#ff6b9d;color:#ff6b9d">executor Pod<br/><small>busybox TTL:60s</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#56d4a0;color:#56d4a0">JobName<br/><small>+ trace_id</small></div>
+  </div>
+
+  <h3>C. Event-driven Migration フロー (Django → KEDA)</h3>
+  <div class="flow-row">
+    <div class="flow-node" style="border-color:#ffd43b;color:#ffd43b">Django API<br/><small>send-event</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#ffd43b;color:#ffd43b">LocalStack SQS<br/><small>send_message</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#56d4a0;color:#56d4a0">KEDA<br/><small>poll 15s</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node" style="border-color:#56d4a0;color:#56d4a0">ScaledJob<br/><small>triggered</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-node">Migration Job<br/><small>apply + delete msg</small></div>
+  </div>
+</section>
+
+<!-- ===== NAMESPACE TABLE ===== -->
+<section id="namespaces">
+  <h2>📋 Namespace 一覧</h2>
+  <table class="info-table">
+    <thead>
+      <tr><th>Namespace</th><th>用途</th><th>Istio Ambient</th><th>主要ワークロード</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>agent-infra</td><td>Go バックエンド API</td><td>✅ ON</td><td>agent-backend (x2 replicas)</td></tr>
+      <tr><td>observability</td><td>トレーシング基盤</td><td>—</td><td>otel-collector, jaeger</td></tr>
+      <tr><td>event-driven</td><td>イベント駆動マイグレーション</td><td>—</td><td>localstack, keda-scaledjob, django</td></tr>
+      <tr><td>agent-sandbox</td><td>隔離実行環境</td><td>🚫 OFF</td><td>ephemeral Jobs (busybox)</td></tr>
+      <tr><td>istio-system</td><td>サービスメッシュ制御プレーン</td><td>—</td><td>ztunnel (DS), istiod, waypoint</td></tr>
+      <tr><td>keda</td><td>KEDA オペレーター</td><td>—</td><td>keda-operator, keda-metrics-apiserver</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+<footer>Cloud Native AI Agent Infra PoC — Architecture Diagram</footer>
+
+</body>
+</html>

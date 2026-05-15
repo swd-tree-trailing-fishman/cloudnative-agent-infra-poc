@@ -1,0 +1,213 @@
+---
+# LocalStack: SQSをモックするためのサービス
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: event-driven
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: event-driven
+  labels:
+    app: localstack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:3.4
+          ports:
+            - containerPort: 4566
+              name: gateway
+          env:
+            - name: SERVICES
+              value: "sqs"
+            - name: DEFAULT_REGION
+              value: "ap-northeast-1"
+            - name: DEBUG
+              value: "0"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: event-driven
+spec:
+  selector:
+    app: localstack
+  ports:
+    - name: gateway
+      port: 4566
+      targetPort: 4566
+
+---
+# SQSキューを作成するInitJob
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-sqs-queue
+  namespace: event-driven
+spec:
+  ttlSecondsAfterFinished: 120
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-localstack
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until wget -qO- http://localstack.event-driven.svc.cluster.local:4566/_localstack/health | grep '"sqs": "available"'; do
+                echo "Waiting for LocalStack SQS..."; sleep 3
+              done
+      containers:
+        - name: create-queue
+          image: amazon/aws-cli:2.15.30
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: "test"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "test"
+            - name: AWS_DEFAULT_REGION
+              value: "ap-northeast-1"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              aws --endpoint-url=http://localstack.event-driven.svc.cluster.local:4566 \
+                sqs create-queue --queue-name db-migration-queue && \
+              echo "Queue created successfully"
+
+---
+# KEDA TriggerAuthentication for LocalStack (dummy AWS creds)
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: localstack-sqs-auth
+  namespace: event-driven
+spec:
+  secretTargetRef: []
+  env:
+    - parameter: awsAccessKeyID
+      name: AWS_ACCESS_KEY_ID
+      containerName: migrator
+    - parameter: awsSecretAccessKey
+      name: AWS_SECRET_ACCESS_KEY
+      containerName: migrator
+
+---
+# KEDA ScaledJob: SQSにメッセージが来たらマイグレーションJobを起動
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: db-migration-scaledjob
+  namespace: event-driven
+spec:
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    activeDeadlineSeconds: 300
+    backoffLimit: 2
+    template:
+      metadata:
+        labels:
+          app: db-migrator
+          type: keda-triggered
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: migrator
+            image: amazon/aws-cli:2.15.30
+            env:
+              - name: AWS_ACCESS_KEY_ID
+                value: "test"
+              - name: AWS_SECRET_ACCESS_KEY
+                value: "test"
+              - name: AWS_DEFAULT_REGION
+                value: "ap-northeast-1"
+              - name: SQS_ENDPOINT
+                value: "http://localstack.event-driven.svc.cluster.local:4566"
+              - name: QUEUE_URL
+                value: "http://localstack.event-driven.svc.cluster.local:4566/000000000000/db-migration-queue"
+            command:
+              - /bin/sh
+              - -c
+              - |
+                echo "[MIGRATION] Starting schema migration..."
+                echo "[MIGRATION] Target DB: $(date +%s)-replica"
+                echo "[MIGRATION] Applying migration: 001_create_users_table..."
+                sleep 3
+                echo "[MIGRATION] Applying migration: 002_add_agent_logs..."
+                sleep 2
+                # メッセージを削除 (処理完了)
+                RECEIPT=$(aws --endpoint-url=$SQS_ENDPOINT sqs receive-message \
+                  --queue-url $QUEUE_URL \
+                  --query 'Messages[0].ReceiptHandle' --output text 2>/dev/null || echo "none")
+                if [ "$RECEIPT" != "none" ] && [ -n "$RECEIPT" ]; then
+                  aws --endpoint-url=$SQS_ENDPOINT sqs delete-message \
+                    --queue-url $QUEUE_URL --receipt-handle "$RECEIPT"
+                fi
+                echo "[MIGRATION] Completed successfully."
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "300m"
+                memory: "256Mi"
+  pollingInterval: 15
+  maxReplicaCount: 5
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        queueURL: "http://localstack.event-driven.svc.cluster.local:4566/000000000000/db-migration-queue"
+        queueLength: "1"
+        awsRegion: "ap-northeast-1"
+        awsEndpoint: "http://localstack.event-driven.svc.cluster.local:4566"
+        # KEDA が LocalStack を使う場合は identityOwner: pod を設定
+        identityOwner: "pod"
+
+---
+# SQSにテストメッセージを投入するためのConfigMap (make send-migration-event で使用)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migration-sender-script
+  namespace: event-driven
+data:
+  send.sh: |
+    #!/bin/sh
+    aws --endpoint-url=http://localstack.event-driven.svc.cluster.local:4566 \
+      sqs send-message \
+      --queue-url http://localstack.event-driven.svc.cluster.local:4566/000000000000/db-migration-queue \
+      --message-body '{"migration_id":"mig-001","db":"users-db","version":"20240101"}' \
+      --region ap-northeast-1
+    echo "Migration event sent!"

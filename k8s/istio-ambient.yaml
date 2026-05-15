@@ -1,0 +1,116 @@
+---
+# Istio Ambient Mesh 有効化:
+# - Namespace に istio.io/dataplane-mode: ambient を付与
+# - サイドカーなし、ztunnel (Node-level L4) + waypoint proxy (L7) で通信を保護
+
+# agent-infra namespace へのラベル付与 (app.yaml で定義済み、参照用に再掲)
+# kubectl label namespace agent-infra istio.io/dataplane-mode=ambient
+
+---
+# Waypoint Proxy: agent-infra の L7 ポリシーを処理するプロキシ
+# Ambient Mode では Deployment/Service ごとに waypoint を作成可能
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agent-infra-waypoint
+  namespace: agent-infra
+  annotations:
+    istio.io/waypoint-for: service
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - name: mesh
+      port: 15008
+      protocol: HBONE
+
+---
+# PeerAuthentication: mTLS を STRICT に設定 (ztunnel 経由で自動)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: agent-infra
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# AuthorizationPolicy: agent-sandbox namespace からのトラフィックを制限
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-sandbox-to-infra
+  namespace: agent-infra
+spec:
+  action: DENY
+  rules:
+    - from:
+        - source:
+            namespaces: ["agent-sandbox"]
+
+---
+# DestinationRule: agent-backend へのトラフィックで ISTIO_MUTUAL を使用
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: agent-backend
+  namespace: agent-infra
+spec:
+  host: agent-backend.agent-infra.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      http:
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+
+---
+# VirtualService: リージョンヘッダーに基づくトラフィック分岐 (将来の拡張用)
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: agent-backend
+  namespace: agent-infra
+spec:
+  hosts:
+    - agent-backend.agent-infra.svc.cluster.local
+  http:
+    - match:
+        - headers:
+            x-region:
+              exact: "JP"
+      route:
+        - destination:
+            host: agent-backend.agent-infra.svc.cluster.local
+            port:
+              number: 80
+          weight: 100
+      timeout: 10s
+    - route:
+        - destination:
+            host: agent-backend.agent-infra.svc.cluster.local
+            port:
+              number: 80
+      timeout: 15s
+
+---
+# ServiceEntry: 外部LLM APIエンドポイントの許可リスト (egress 制御の例)
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: external-llm-api
+  namespace: agent-infra
+spec:
+  hosts:
+    - "api.anthropic.com"
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS

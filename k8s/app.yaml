@@ -1,0 +1,163 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-infra
+  labels:
+    # Istio Ambient Mesh: ztunnel を有効化するラベル
+    istio.io/dataplane-mode: ambient
+    istio-injection: disabled
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-backend
+  namespace: agent-infra
+
+---
+# RBAC: sandbox job を動的生成するための権限
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sandbox-job-creator
+  namespace: agent-sandbox
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-backend-sandbox
+  namespace: agent-sandbox
+subjects:
+  - kind: ServiceAccount
+    name: agent-backend
+    namespace: agent-infra
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: sandbox-job-creator
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-sandbox
+  labels:
+    # Sandbox Podはサービスメッシュ対象外
+    istio.io/dataplane-mode: none
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+  namespace: agent-infra
+data:
+  FEATURE_NEW_RECOMMEND_ENGINE: "true"
+  FEATURE_MULTI_LANG: "true"
+  FEATURE_AGENT_SANDBOX: "true"
+  SANDBOX_NAMESPACE: "agent-sandbox"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector.observability.svc.cluster.local:4317"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-backend
+  namespace: agent-infra
+  labels:
+    app: agent-backend
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agent-backend
+  template:
+    metadata:
+      labels:
+        app: agent-backend
+        version: v1
+    spec:
+      serviceAccountName: agent-backend
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: server
+          image: agent-backend:latest
+          imagePullPolicy: Never  # Kind local registry
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: agent-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-backend
+  namespace: agent-infra
+  labels:
+    app: agent-backend
+spec:
+  selector:
+    app: agent-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# Istio: Layer 7 認可ポリシー (Ambient Mesh + waypoint proxy経由)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: agent-backend-allow
+  namespace: agent-infra
+spec:
+  selector:
+    matchLabels:
+      app: agent-backend
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["agent-infra", "istio-system"]
+      to:
+        - operation:
+            ports: ["8080"]
+            methods: ["GET", "POST"]

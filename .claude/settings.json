@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(mkdir *)",
+      "Bash(go *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(kubectl *)",
+      "Bash(kind *)",
+      "Bash(helm *)",
+      "Bash(docker *)",
+      "Bash(make *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(curl *)",
+      "Bash(wsl *)",
+      "PowerShell(mkdir *)",
+      "PowerShell(ls *)",
+      "PowerShell(Get-ChildItem *)"
+    ]
+  }
+}

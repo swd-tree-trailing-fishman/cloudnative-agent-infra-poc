@@ -1,0 +1,17 @@
+# Normalize line endings to LF in repo, checkout as-is
+* text=auto eol=lf
+
+# Force LF for these file types
+*.go    text eol=lf
+*.py    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.md    text eol=lf
+*.html  text eol=lf
+*.sh    text eol=lf
+Makefile text eol=lf
+
+# Binary
+*.png   binary
+*.jpg   binary
+*.gif   binary
