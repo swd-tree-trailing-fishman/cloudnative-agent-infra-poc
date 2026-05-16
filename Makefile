@@ -218,9 +218,9 @@ logs-otel:
 
 ## ドキュメントをローカル HTTP サーバーで配信 (docs/index.html が README.md を動的描画)
 docs-serve:
-	@echo "📚 Docs: http://localhost:8888"
+	@echo "📚 Docs: http://localhost:8888/docs/"
 	@echo "   docs/index.html が README.md を fetch → marked.js + Mermaid.js で描画します"
-	cd docs && python3 -m http.server 8888
+	python3 -m http.server 8888
 
 ## README.md の Mermaid 図を SVG として docs/diagrams/ に書き出す (要: Node.js)
 ## 生成物: docs/diagrams/README-1.svg, README-2.svg, ... (図の順番に連番)
