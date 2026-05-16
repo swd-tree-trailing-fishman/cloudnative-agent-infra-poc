@@ -47,6 +47,8 @@ func (t *Toggle) ConfigForRegion(regionHeader string) Config {
 	switch region {
 	case RegionJP:
 		cfg.DefaultLang = "ja"
+		// JP always uses the new engine regardless of the global flag,
+		// as it is the primary market for the new recommendation model.
 		cfg.EnableNewRecommendEngine = true
 	case RegionTW:
 		cfg.DefaultLang = "zh-TW"
@@ -58,10 +60,6 @@ func (t *Toggle) ConfigForRegion(regionHeader string) Config {
 	}
 
 	return cfg
-}
-
-func (t *Toggle) IsEnabled(flag string) bool {
-	return t.globalFlags[flag]
 }
 
 func parseRegion(header string) Region {

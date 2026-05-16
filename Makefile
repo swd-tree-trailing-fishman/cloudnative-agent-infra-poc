@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 # =============================================================================
 # Cloud Native AI Agent Infra - PoC Makefile
 # 前提: WSL上でkind, kubectl, helm, docker, curl がインストール済み
@@ -19,7 +21,8 @@ KEDA_VERSION   := 2.14.0
 .PHONY: all cluster-up istio-install keda-install deploy deploy-python \
         test-request test-recommend test-execute test-migration \
         send-migration-event port-forward-jaeger port-forward-app \
-        logs-backend logs-migration cluster-down clean help
+        logs-backend logs-migration cluster-down clean \
+        docs-serve mermaid-export help
 
 # デフォルトターゲット
 all: cluster-up deploy
@@ -210,6 +213,35 @@ logs-otel:
 	kubectl logs -n $(NAMESPACE_OBS) -l app=otel-collector --follow --tail=50
 
 # =============================================================================
+# ドキュメント
+# =============================================================================
+
+## ドキュメントをローカル HTTP サーバーで配信 (docs/index.html が README.md を動的描画)
+docs-serve:
+	@echo "📚 Docs: http://localhost:8888"
+	@echo "   docs/index.html が README.md を fetch → marked.js + Mermaid.js で描画します"
+	cd docs && python3 -m http.server 8888
+
+## README.md の Mermaid 図を SVG として docs/diagrams/ に書き出す (要: Node.js)
+## 生成物: docs/diagrams/README-1.svg, README-2.svg, ... (図の順番に連番)
+## WSL2 で Chromium がない場合は: sudo apt-get install -y chromium-browser
+mermaid-export:
+	@mkdir -p docs/diagrams
+	@echo ">>> Exporting Mermaid diagrams from README.md → docs/diagrams/ ..."
+	@if ! command -v node &>/dev/null; then \
+		echo "❌ Node.js が見つかりません。https://nodejs.org からインストールしてください。"; exit 1; \
+	fi
+	npx --yes @mermaid-js/mermaid-cli \
+		--input README.md \
+		--output docs/diagrams/ \
+		--theme dark \
+		--backgroundColor '#07090f' \
+		--width 1200 \
+		--puppeteerConfig '{"args":["--no-sandbox","--disable-setuid-sandbox"]}'
+	@echo "✅ SVGs exported to docs/diagrams/"
+	@ls -1 docs/diagrams/*.svg 2>/dev/null | sed 's/^/   /'
+
+# =============================================================================
 # クリーンアップ
 # =============================================================================
 
@@ -247,3 +279,7 @@ help:
 	@echo "  port-forward-jaeger Jaeger UI を localhost:16686 に転送"
 	@echo "  logs-backend        Go バックエンドのログをフォロー"
 	@echo "  logs-migration      マイグレーション Job のログを表示"
+	@echo ""
+	@echo "Docs:"
+	@echo "  docs-serve          ドキュメントを localhost:8888 で配信"
+	@echo "  mermaid-export      README.md の Mermaid 図を docs/diagrams/ に SVG 出力"

@@ -18,10 +18,15 @@ import (
 type API struct {
 	toggle  *feature.Toggle
 	sandbox *sandbox.Runner
+	tracer  trace.Tracer
 }
 
 func New(toggle *feature.Toggle, sandboxRunner *sandbox.Runner) *API {
-	return &API{toggle: toggle, sandbox: sandboxRunner}
+	return &API{
+		toggle:  toggle,
+		sandbox: sandboxRunner,
+		tracer:  otel.Tracer("agent-infra/handler"),
+	}
 }
 
 func (a *API) RegisterRoutes(mux *http.ServeMux) {
@@ -30,16 +35,20 @@ func (a *API) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/execute", a.handleExecute)
 }
 
-// handleHealth is a simple liveness probe endpoint.
 func (a *API) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Printf("health encode error: %v", err)
+	}
 }
 
-// handleRecommend demonstrates Feature Toggle + OTEL tracing.
 func (a *API) handleRecommend(w http.ResponseWriter, r *http.Request) {
-	tracer := otel.Tracer("agent-infra/handler")
-	ctx, span := tracer.Start(r.Context(), "recommend.handle",
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, span := a.tracer.Start(r.Context(), "recommend.handle",
 		trace.WithAttributes(
 			attribute.String("http.method", r.Method),
 			attribute.String("http.path", r.URL.Path),
@@ -62,12 +71,13 @@ func (a *API) handleRecommend(w http.ResponseWriter, r *http.Request) {
 	result := a.buildRecommendation(ctx, cfg)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Printf("recommend encode error: %v", err)
+	}
 }
 
 func (a *API) buildRecommendation(ctx context.Context, cfg feature.Config) map[string]interface{} {
-	tracer := otel.Tracer("agent-infra/handler")
-	_, span := tracer.Start(ctx, "recommend.llm_call")
+	_, span := a.tracer.Start(ctx, "recommend.llm_call")
 	defer span.End()
 
 	// Simulate LLM processing latency
@@ -92,24 +102,22 @@ func (a *API) buildRecommendation(ctx context.Context, cfg feature.Config) map[s
 	}
 
 	return map[string]interface{}{
-		"region":      cfg.Region,
-		"lang":        cfg.DefaultLang,
-		"new_engine":  cfg.EnableNewRecommendEngine,
-		"message":     msg,
-		"items":       items,
-		"trace_id":    span.SpanContext().TraceID().String(),
+		"region":     cfg.Region,
+		"lang":       cfg.DefaultLang,
+		"new_engine": cfg.EnableNewRecommendEngine,
+		"message":    msg,
+		"items":      items,
+		"trace_id":   span.SpanContext().TraceID().String(),
 	}
 }
 
-// handleExecute spawns a sandbox K8s Job for agent code execution requests.
 func (a *API) handleExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	tracer := otel.Tracer("agent-infra/handler")
-	ctx, span := tracer.Start(r.Context(), "sandbox.execute")
+	ctx, span := a.tracer.Start(r.Context(), "sandbox.execute")
 	defer span.End()
 
 	var req struct {
@@ -122,15 +130,16 @@ func (a *API) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if a.sandbox == nil {
-		// Sandbox unavailable (e.g., no K8s in local dev) — return mock response
 		span.SetAttributes(attribute.Bool("sandbox.mock", true))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"job_name": "mock-job-0000",
 			"status":   "mock_created",
 			"message":  "[MOCK] Sandbox job would be created here",
 			"trace_id": span.SpanContext().TraceID().String(),
-		})
+		}); err != nil {
+			log.Printf("execute mock encode error: %v", err)
+		}
 		return
 	}
 
@@ -145,11 +154,13 @@ func (a *API) handleExecute(w http.ResponseWriter, r *http.Request) {
 	span.SetAttributes(attribute.String("sandbox.job_name", result.JobName))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"job_name":   result.JobName,
 		"status":     result.Status,
 		"message":    result.Message,
 		"started_at": result.StartedAt,
 		"trace_id":   span.SpanContext().TraceID().String(),
-	})
+	}); err != nil {
+		log.Printf("execute encode error: %v", err)
+	}
 }

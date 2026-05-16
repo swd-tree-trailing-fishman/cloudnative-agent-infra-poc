@@ -105,14 +105,13 @@ spec:
               echo "Queue created successfully"
 
 ---
-# KEDA TriggerAuthentication for LocalStack (dummy AWS creds)
+# KEDA TriggerAuthentication for LocalStack (reads creds from migrator container env)
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
   name: localstack-sqs-auth
   namespace: event-driven
 spec:
-  secretTargetRef: []
   env:
     - parameter: awsAccessKeyID
       name: AWS_ACCESS_KEY_ID
@@ -159,20 +158,23 @@ spec:
               - /bin/sh
               - -c
               - |
-                echo "[MIGRATION] Starting schema migration..."
-                echo "[MIGRATION] Target DB: $(date +%s)-replica"
+                # メッセージを受信して ReceiptHandle を先に取得してから処理する
+                MSG=$(aws --endpoint-url=$SQS_ENDPOINT sqs receive-message \
+                  --queue-url $QUEUE_URL --max-number-of-messages 1 \
+                  --visibility-timeout 300 --output json 2>/dev/null)
+                RECEIPT=$(echo "$MSG" | grep -o '"ReceiptHandle": "[^"]*"' | cut -d'"' -f4)
+                BODY=$(echo "$MSG" | grep -o '"Body": "[^"]*"' | cut -d'"' -f4)
+                if [ -z "$RECEIPT" ]; then
+                  echo "[MIGRATION] No message available, exiting."
+                  exit 0
+                fi
+                echo "[MIGRATION] Processing: $BODY"
                 echo "[MIGRATION] Applying migration: 001_create_users_table..."
                 sleep 3
                 echo "[MIGRATION] Applying migration: 002_add_agent_logs..."
                 sleep 2
-                # メッセージを削除 (処理完了)
-                RECEIPT=$(aws --endpoint-url=$SQS_ENDPOINT sqs receive-message \
-                  --queue-url $QUEUE_URL \
-                  --query 'Messages[0].ReceiptHandle' --output text 2>/dev/null || echo "none")
-                if [ "$RECEIPT" != "none" ] && [ -n "$RECEIPT" ]; then
-                  aws --endpoint-url=$SQS_ENDPOINT sqs delete-message \
-                    --queue-url $QUEUE_URL --receipt-handle "$RECEIPT"
-                fi
+                aws --endpoint-url=$SQS_ENDPOINT sqs delete-message \
+                  --queue-url $QUEUE_URL --receipt-handle "$RECEIPT"
                 echo "[MIGRATION] Completed successfully."
             resources:
               requests:
@@ -187,12 +189,13 @@ spec:
   failedJobsHistoryLimit: 2
   triggers:
     - type: aws-sqs-queue
+      authenticationRef:
+        name: localstack-sqs-auth
       metadata:
         queueURL: "http://localstack.event-driven.svc.cluster.local:4566/000000000000/db-migration-queue"
         queueLength: "1"
         awsRegion: "ap-northeast-1"
         awsEndpoint: "http://localstack.event-driven.svc.cluster.local:4566"
-        # KEDA が LocalStack を使う場合は identityOwner: pod を設定
         identityOwner: "pod"
 
 ---

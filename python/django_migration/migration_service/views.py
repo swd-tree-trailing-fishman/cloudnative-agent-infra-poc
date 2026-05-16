@@ -10,6 +10,7 @@ import json
 import time
 import uuid
 import logging
+import threading
 
 import boto3
 from botocore.exceptions import ClientError
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 # OpenTelemetry セットアップ (モジュールロード時に一度だけ初期化)
 # ---------------------------------------------------------------------------
 _tracer = None
+_tracer_lock = threading.Lock()
 
 
 def _get_tracer() -> trace.Tracer:
@@ -36,19 +38,23 @@ def _get_tracer() -> trace.Tracer:
     if _tracer is not None:
         return _tracer
 
-    resource = Resource.create({"service.name": settings.OTEL_SERVICE_NAME})
-    provider = TracerProvider(resource=resource)
-    try:
-        exporter = OTLPSpanExporter(
-            endpoint=settings.OTEL_ENDPOINT,
-            insecure=True,
-        )
-        provider.add_span_processor(BatchSpanProcessor(exporter))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("OTLP exporter init failed (tracing disabled): %s", exc)
+    with _tracer_lock:
+        if _tracer is not None:
+            return _tracer
 
-    trace.set_tracer_provider(provider)
-    _tracer = trace.get_tracer(settings.OTEL_SERVICE_NAME)
+        resource = Resource.create({"service.name": settings.OTEL_SERVICE_NAME})
+        provider = TracerProvider(resource=resource)
+        try:
+            exporter = OTLPSpanExporter(
+                endpoint=settings.OTEL_ENDPOINT,
+                insecure=True,
+            )
+            provider.add_span_processor(BatchSpanProcessor(exporter))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("OTLP exporter init failed (tracing disabled): %s", exc)
+
+        trace.set_tracer_provider(provider)
+        _tracer = trace.get_tracer(settings.OTEL_SERVICE_NAME)
     return _tracer
 
 
@@ -60,8 +66,8 @@ def _get_sqs_client():
         "sqs",
         region_name=settings.AWS_DEFAULT_REGION,
         endpoint_url=settings.AWS_ENDPOINT_URL,
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
     )
 
 
@@ -155,7 +161,6 @@ def send_sqs_event(request):
             response = sqs.send_message(
                 QueueUrl=settings.SQS_QUEUE_URL,
                 MessageBody=json.dumps(payload),
-                MessageGroupId="migration",  # FIFO対応 (標準キューでは無視される)
             )
             message_id = response.get("MessageId", "unknown")
             span.set_attribute("sqs.message_id", message_id)
@@ -173,6 +178,7 @@ def send_sqs_event(request):
             return JsonResponse({"error": str(exc)}, status=500)
 
 
+@require_http_methods(["GET"])
 def migration_status(request):
     """SQSキューのメッセージ数を返す (KEDAトリガー確認用)"""
     tracer = _get_tracer()

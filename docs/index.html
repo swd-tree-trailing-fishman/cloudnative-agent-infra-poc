@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cloud Native AI Agent Infra PoC</title>
   <style>
     :root {
@@ -22,364 +22,301 @@
       --red: #ff6b9d;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.72;
+      letter-spacing: -.01em;
+    }
 
     /* NAV */
-    nav { display: flex; align-items: center; gap: 1.5rem; padding: .8rem 2rem; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding: .8rem 2rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
     nav .logo { font-weight: 700; font-size: 1rem; color: var(--istio); white-space: nowrap; }
     nav a { color: var(--muted); text-decoration: none; font-size: .85rem; padding: .3rem .7rem; border-radius: 6px; transition: .2s; }
     nav a:hover, nav a.active { background: var(--card); color: var(--text); }
+    nav .sep { color: var(--border-hi); font-size: .75rem; }
 
-    /* HERO */
-    .hero {
-      position: relative;
+    /* MAIN */
+    main { max-width: 860px; margin: 0 auto; padding: 3.5rem 2rem 8rem; }
+
+    /* LOADING */
+    #loading {
       text-align: center;
-      padding: 5rem 2rem 3rem;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
+      padding: 6rem 2rem;
+      color: var(--muted);
+      font-size: .9rem;
     }
-    .hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at 50% 0%, rgba(124,131,255,.15) 0%, transparent 70%);
-      pointer-events: none;
+    #loading .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--istio);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 1rem;
     }
-    .hero h1 {
-      font-size: 2.8rem;
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ERROR */
+    #error {
+      display: none;
+      margin: 4rem auto;
+      max-width: 540px;
+      background: var(--card);
+      border: 1px solid var(--red);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+    #error h3 { color: var(--red); margin-bottom: .8rem; }
+    #error code { background: var(--surface); border-radius: 4px; padding: .15rem .4rem; font-family: monospace; font-size: .85rem; color: var(--otel); }
+
+    /* ── MARKDOWN RENDERED CONTENT ── */
+    #content h1 {
+      font-size: 2.4rem;
       font-weight: 800;
       background: linear-gradient(135deg, var(--istio) 0%, var(--keda) 60%, var(--go) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: .8rem;
+      margin: 3rem 0 1rem;
       line-height: 1.2;
     }
-    .hero p { color: var(--muted); font-size: 1.05rem; max-width: 600px; margin: 0 auto .5rem; }
-    .badge-row { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: 1.2rem; }
-    .badge { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: .2rem .7rem; font-size: .75rem; color: var(--muted); }
+    #content h1:first-child { margin-top: 0; }
 
-    /* DOCS GRID */
-    main { max-width: 1100px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
-    h2 { font-size: 1.4rem; color: var(--istio); margin-bottom: 1.5rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
-    h3 { font-size: 1rem; color: var(--keda); margin: 1.8rem 0 .8rem; }
-    p { margin-bottom: .8rem; font-size: .9rem; color: var(--text); }
-
-    .doc-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.2rem;
-      margin: 1.5rem 0;
+    #content h2 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--istio);
+      margin: 4rem 0 1.5rem;
+      padding-bottom: .6rem;
+      border-bottom: 1px solid var(--border);
     }
-    .doc-card {
+    #content h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--keda);
+      margin: 2.5rem 0 .9rem;
+    }
+    #content h4 {
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--otel);
+      margin: 2rem 0 .7rem;
+    }
+
+    #content p {
+      font-size: .93rem;
+      line-height: 1.8;
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+
+    #content ul, #content ol {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    #content li {
+      font-size: .93rem;
+      line-height: 1.9;
+      color: var(--text);
+    }
+    #content li + li { margin-top: .1rem; }
+
+    #content a {
+      color: var(--istio);
+      text-decoration: none;
+    }
+    #content a:hover { text-decoration: underline; }
+
+    #content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.5rem 0;
+    }
+
+    #content strong { color: #e2eaf8; }
+    #content em { color: var(--muted); }
+
+    /* Inline code */
+    #content code {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: .83em;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: .1em .4em;
+      color: var(--otel);
+    }
+
+    /* Code block */
+    #content pre {
+      background: #0a0d16;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.3rem 1.5rem;
+      overflow-x: auto;
+      margin: 1rem 0 1.5rem;
+      line-height: 1.65;
+    }
+    #content pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: .83rem;
+      color: var(--text);
+    }
+
+    /* Blockquote (used for term definitions) */
+    #content blockquote {
+      border-left: 3px solid var(--istio);
+      margin: 1rem 0;
+      padding: .8rem 1.2rem;
+      background: rgba(124,131,255,.06);
+      border-radius: 0 8px 8px 0;
+    }
+    #content blockquote p {
+      font-size: .88rem;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.7;
+    }
+
+    /* Tables */
+    #content table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .86rem;
+      margin: 1rem 0 1.5rem;
+    }
+    #content th {
+      background: var(--card);
+      color: var(--istio);
+      font-weight: 600;
+      text-align: left;
+      padding: .55rem .9rem;
+      border: 1px solid var(--border);
+    }
+    #content td {
+      padding: .5rem .9rem;
+      border: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: top;
+    }
+    #content tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+    /* Badges / img (shields.io) */
+    #content img { vertical-align: middle; margin: .1rem .15rem; }
+
+    /* Mermaid */
+    #content .mermaid {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 1.5rem;
-      text-decoration: none;
-      display: flex;
-      flex-direction: column;
-      gap: .6rem;
-      transition: .25s;
-      position: relative;
-      overflow: hidden;
+      padding: 2rem 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      text-align: center;
     }
-    .doc-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--accent, var(--istio));
-      border-radius: 14px 14px 0 0;
+    #content .mermaid svg { max-width: 100%; height: auto; }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: .82rem;
     }
-    .doc-card:hover { transform: translateY(-3px); border-color: var(--border-hi); }
-    .doc-card .icon { font-size: 2.2rem; }
-    .doc-card h3 { margin: 0; font-size: 1rem; color: var(--text); }
-    .doc-card p { margin: 0; font-size: .83rem; color: var(--muted); flex: 1; }
-    .doc-card .cta { font-size: .8rem; color: var(--istio); margin-top: .3rem; }
-
-    /* FEATURE SECTION */
-    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin: 1.2rem 0; }
-    .feature-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.3rem; }
-    .feature-card .fhead { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem; }
-    .feature-card .fhead .label { font-weight: 700; font-size: .95rem; }
-    .feature-card p { font-size: .84rem; color: var(--muted); margin: 0; }
-    .tag { display: inline-block; font-size: .7rem; padding: .1rem .45rem; border-radius: 4px; font-weight: 600; margin-left: .3rem; }
-    .tag-go { background: rgba(0,174,216,.15); color: var(--go); }
-    .tag-py { background: rgba(255,212,59,.12); color: var(--py); }
-    .tag-k8s { background: rgba(50,108,229,.15); color: var(--k8s); }
-    .tag-istio { background: rgba(124,131,255,.15); color: var(--istio); }
-    .tag-keda { background: rgba(86,212,160,.12); color: var(--keda); }
-    .tag-otel { background: rgba(255,169,77,.12); color: var(--otel); }
-
-    /* QUICKSTART */
-    pre.qs { background: #0a0d16; border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem 1.4rem; font-family: 'Cascadia Code','Fira Code',monospace; font-size: .83rem; overflow-x: auto; line-height: 1.7; margin: .8rem 0; }
-    .qs-comment { color: #56d4a0; }
-    .qs-cmd { color: #cdd9f0; }
-
-    /* LEARNING */
-    .learn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin: 1rem 0; }
-    .learn-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; }
-    .learn-card h4 { font-size: .9rem; margin-bottom: .5rem; color: var(--text); }
-    .learn-card ul { padding-left: 1.2rem; font-size: .82rem; color: var(--muted); line-height: 2; }
-
-    footer { text-align: center; padding: 2rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
   </style>
 </head>
 <body>
 
 <nav>
   <span class="logo">☸ Cloud Native PoC</span>
-  <a href="index.html" class="active">概要</a>
+  <a href="index.html" class="active">📄 README</a>
+  <span class="sep">|</span>
   <a href="architecture.html">🏗 Architecture</a>
   <a href="network.html">🕸 Network</a>
   <a href="services.html">🔗 Services</a>
 </nav>
 
-<div class="hero">
-  <h1>Cloud Native<br>AI Agent Infra PoC</h1>
-  <p>WSL2 + Kind + Istio Ambient + KEDA + OpenTelemetry で構築する自律型AIエージェント基盤</p>
-  <div class="badge-row">
-    <span class="badge">Go 1.22</span>
-    <span class="badge">Python / Django 5</span>
-    <span class="badge">Kubernetes 1.29</span>
-    <span class="badge">Istio 1.21 Ambient</span>
-    <span class="badge">KEDA 2.14</span>
-    <span class="badge">OpenTelemetry 1.24</span>
-    <span class="badge">Jaeger 1.56</span>
-    <span class="badge">LocalStack SQS</span>
-    <span class="badge">Kind 0.22</span>
-  </div>
-</div>
-
 <main>
+  <div id="loading">
+    <div class="spinner"></div>
+    README.md を読み込んでいます…
+  </div>
 
-  <!-- DOCS LINKS -->
-  <section>
-    <h2>📚 ドキュメント</h2>
-    <div class="doc-grid">
-      <a href="architecture.html" class="doc-card" style="--accent: var(--istio)">
-        <span class="icon">🏗</span>
-        <h3>インフラ・アプリ構成図</h3>
-        <p>WSL2 → Kind → Namespace → Pod の全レイヤーをSVGで可視化。コンポーネント配置と接続を一目で把握。</p>
-        <span class="cta">architecture.html →</span>
-      </a>
-      <a href="network.html" class="doc-card" style="--accent: var(--keda)">
-        <span class="icon">🕸</span>
-        <h3>ネットワーク・Istio Ambient 図</h3>
-        <p>ztunnel (L4 mTLS) + Waypoint Proxy (L7) のトラフィックフロー。mTLS証明書フローと Namespace 分離ポリシーも解説。</p>
-        <span class="cta">network.html →</span>
-      </a>
-      <a href="services.html" class="doc-card" style="--accent: var(--go)">
-        <span class="icon">🔗</span>
-        <h3>サービス依存関係マップ</h3>
-        <p>全サービス間の通信プロトコル・エンドポイントをグラフで可視化。API一覧・技術スタック詳細も収録。</p>
-        <span class="cta">services.html →</span>
-      </a>
-    </div>
-  </section>
+  <div id="error">
+    <h3>読み込みエラー</h3>
+    <p>README.md の取得に失敗しました。<code>file://</code> プロトコルでは fetch が使えません。</p>
+    <p style="margin-top:1rem;font-size:.85rem;color:var(--muted);">
+      以下のコマンドでローカルサーバーを起動してください：
+    </p>
+    <pre style="margin-top:.8rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:monospace;font-size:.82rem;color:var(--keda)">make docs-serve
+# → http://localhost:8888 で開く</pre>
+  </div>
 
-  <!-- CORE FEATURES -->
-  <section>
-    <h2>🎯 5つのコア機能</h2>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="fhead">
-          <span style="font-size:1.4rem">🔀</span>
-          <span class="label">A. Feature Toggle<span class="tag tag-go">Go</span></span>
-        </div>
-        <p>
-          <code>X-Region</code> ヘッダーでJP/TW/KRを判定し、応答言語・推薦エンジン・フラグを動的に切り替え。
-          ConfigMapで環境全体のフラグを制御。
-          <br/><br/>
-          <strong style="color:var(--keda)">学習ポイント:</strong> 環境変数によるフィーチャーフラグ、リクエスト単位の設定注入
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="fhead">
-          <span style="font-size:1.4rem">🔭</span>
-          <span class="label">B. Agent Observability<span class="tag tag-otel">OTLP</span></span>
-        </div>
-        <p>
-          APIリクエスト〜LLM呼び出し〜レスポンスまでの全経路をOpenTelemetryで計装。
-          OTLP Collector → Jaeger でウォーターフォール表示。
-          <br/><br/>
-          <strong style="color:var(--keda)">学習ポイント:</strong> 分散トレース、スパン伝播、OTLP gRPCエクスポート
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="fhead">
-          <span style="font-size:1.4rem">📦</span>
-          <span class="label">C. Agent Sandbox<span class="tag tag-k8s">K8s</span></span>
-        </div>
-        <p>
-          コード実行リクエストを受け取ると、Kubernetes APIで一時的なJob Podを動的生成。
-          TTL 60秒で自動削除。readOnly + nonRoot で安全に隔離。
-          <br/><br/>
-          <strong style="color:var(--keda)">学習ポイント:</strong> K8s Dynamic Resource Creation, RBAC 最小権限
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="fhead">
-          <span style="font-size:1.4rem">⚡</span>
-          <span class="label">D. Event-driven Migration<span class="tag tag-keda">KEDA</span><span class="tag tag-py">Django</span></span>
-        </div>
-        <p>
-          LocalStack SQS にメッセージを投入するとKEDAが検知し、ScaledJobを自動起動。
-          Django APIからboto3でイベント送信。最大5並列でマイグレーション実行。
-          <br/><br/>
-          <strong style="color:var(--keda)">学習ポイント:</strong> イベント駆動アーキテクチャ、KEDA ScaledJob、boto3
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="fhead">
-          <span style="font-size:1.4rem">🕸</span>
-          <span class="label">E. Ambient Networking<span class="tag tag-istio">Istio</span></span>
-        </div>
-        <p>
-          サイドカーなしでmTLSを実現するIstio Ambient Mode。
-          ztunnel (Node L4) + Waypoint Proxy (Service L7) の二層構造。
-          Sandbox NamespaceからのInboundを AuthorizationPolicy で拒否。
-          <br/><br/>
-          <strong style="color:var(--keda)">学習ポイント:</strong> サービスメッシュ、ゼロトラスト、mTLS STRICT
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <!-- QUICKSTART -->
-  <section>
-    <h2>🚀 クイックスタート</h2>
-    <p>WSLターミナルでコピペ実行するだけで全環境が立ち上がります。</p>
-
-    <h3>① クラスタ起動（約10分）</h3>
-    <pre class="qs"><span class="qs-comment"># Kind クラスタ作成 + Istio Ambient + KEDA インストール</span>
-<span class="qs-cmd">make cluster-up</span></pre>
-
-    <h3>② アプリデプロイ</h3>
-    <pre class="qs"><span class="qs-comment"># Go + Django をビルド → Kind にロード → K8s にデプロイ</span>
-<span class="qs-cmd">make deploy</span></pre>
-
-    <h3>③ ポートフォワード（別ターミナルで）</h3>
-    <pre class="qs"><span class="qs-comment"># Go API → localhost:8080</span>
-<span class="qs-cmd">make port-forward-app</span>
-
-<span class="qs-comment"># Jaeger UI → localhost:16686</span>
-<span class="qs-cmd">make port-forward-jaeger</span></pre>
-
-    <h3>④ 動作確認</h3>
-    <pre class="qs"><span class="qs-comment"># Feature Toggle: JP/TW/KR でリージョン切り替え</span>
-<span class="qs-cmd">make test-recommend</span>
-
-<span class="qs-comment"># Agent Sandbox: K8s Job 動的生成テスト</span>
-<span class="qs-cmd">make test-execute</span>
-
-<span class="qs-comment"># Event-driven Migration: SQS → KEDA → Job E2E</span>
-<span class="qs-cmd">make test-migration</span></pre>
-
-    <h3>アクセスポイント</h3>
-    <pre class="qs"><span class="qs-comment"># Go API — Feature Toggle</span>
-<span class="qs-cmd">curl -s -H "X-Region: JP" http://localhost:8080/api/recommend | jq</span>
-
-<span class="qs-comment"># Agent Sandbox</span>
-<span class="qs-cmd">curl -s -X POST http://localhost:8080/api/execute \
-  -H "Content-Type: application/json" \
-  -d '{"command":"echo hello"}' | jq</span>
-
-<span class="qs-comment"># Jaeger UI でトレース確認</span>
-<span class="qs-cmd">open http://localhost:16686</span>
-
-<span class="qs-comment"># Django: SQS にマイグレーションイベントを送信</span>
-<span class="qs-cmd">curl -s -X POST http://localhost:8000/api/migration/send-event \
-  -H "Content-Type: application/json" \
-  -d '{"migration_id":"mig-001","db":"users-db"}' | jq</span></pre>
-  </section>
-
-  <!-- LEARNING POINTS -->
-  <section>
-    <h2>🧠 学習ポイント まとめ</h2>
-    <div class="learn-grid">
-      <div class="learn-card">
-        <h4>🐹 Go — Cloud Native パターン</h4>
-        <ul>
-          <li><code>signal.NotifyContext</code> による Graceful Shutdown</li>
-          <li><code>rest.InClusterConfig()</code> → K8s 動的リソース生成</li>
-          <li><code>otel.Tracer()</code> で子スパン作成・属性付与</li>
-          <li>環境変数によるフィーチャーフラグ制御</li>
-          <li>distroless イメージで攻撃面を最小化</li>
-        </ul>
-      </div>
-      <div class="learn-card">
-        <h4>🐍 Python / Django — SRE 実装</h4>
-        <ul>
-          <li><code>with tracer.start_as_current_span()</code> でスパン自動終了</li>
-          <li><code>boto3.client("sqs")</code> でLocalStack SQS連携</li>
-          <li><code>@csrf_exempt</code> + <code>@require_http_methods</code> デコレーター</li>
-          <li><code>JsonResponse</code> でRESTful APIレスポンス</li>
-          <li><code>gunicorn</code> + WSGI 本番デプロイパターン</li>
-        </ul>
-      </div>
-      <div class="learn-card">
-        <h4>☸ Kubernetes — 運用パターン</h4>
-        <ul>
-          <li>RBAC 最小権限 (Role + RoleBinding)</li>
-          <li>TTLSecondsAfterFinished で Job 自動クリーンアップ</li>
-          <li>readOnlyRootFilesystem + runAsNonRoot セキュリティ</li>
-          <li>ConfigMap による設定外部化</li>
-          <li>KEDA ScaledJob でイベント駆動オートスケール</li>
-        </ul>
-      </div>
-      <div class="learn-card">
-        <h4>🕸 Istio Ambient — ゼロトラスト</h4>
-        <ul>
-          <li>Namespace ラベルのみでmTLS有効化 (サイドカー不要)</li>
-          <li>ztunnel (L4) + Waypoint (L7) の二層分離</li>
-          <li>PeerAuthentication STRICT で全通信暗号化</li>
-          <li>AuthorizationPolicy で Namespace 間アクセス制御</li>
-          <li>VirtualService でヘッダーベースルーティング</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- FILE TREE -->
-  <section>
-    <h2>📁 ファイル構成</h2>
-    <pre class="qs" style="color:#cdd9f0">day1_review_code/
-├── <span class="qs-comment">Makefile</span>                       ← 全操作ここから (cluster-up / deploy / test-*)
-├── Dockerfile                     ← Go API (distroless multi-stage)
-├── go.mod
-├── cmd/server/<span class="qs-comment">main.go</span>             ← HTTPサーバー・graceful shutdown
-├── internal/
-│   ├── feature/<span class="qs-comment">toggle.go</span>          ← X-Region → JP/TW/KR フィーチャー切り替え
-│   ├── observability/<span class="qs-comment">otel.go</span>      ← OTLP gRPC トレーサー初期化
-│   ├── sandbox/<span class="qs-comment">job.go</span>             ← K8s batch/Job 動的生成
-│   └── handler/<span class="qs-comment">api.go</span>             ← /api/recommend, /api/execute
-├── k8s/
-│   ├── <span class="qs-comment">app.yaml</span>                   ← Deployment, Service, RBAC, AuthPolicy
-│   ├── <span class="qs-comment">observability.yaml</span>         ← OTLP Collector + Jaeger
-│   ├── <span class="qs-comment">migration-scaledjob.yaml</span>   ← LocalStack + KEDA ScaledJob
-│   └── <span class="qs-comment">istio-ambient.yaml</span>         ← Waypoint, PeerAuth, VirtualService
-├── python/django_migration/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── migration_service/
-│       ├── <span class="qs-comment">views.py</span>               ← SQS送信・OTLP計装・Migration実行
-│       ├── settings.py
-│       └── urls.py
-└── docs/
-    ├── <span class="qs-comment">index.html</span>                 ← このページ (概要・クイックスタート)
-    ├── <span class="qs-comment">architecture.html</span>          ← インフラ構成図 (SVG)
-    ├── <span class="qs-comment">network.html</span>               ← Istio Ambient ネットワーク図
-    └── <span class="qs-comment">services.html</span>              ← サービス依存関係マップ</pre>
-  </section>
-
+  <article id="content" style="display:none"></article>
 </main>
 
-<footer>
-  <p>Cloud Native AI Agent Infra PoC — WSL2 + Kind + Istio Ambient + KEDA + OpenTelemetry</p>
-  <p style="margin-top:.4rem">Go + Python (Django) で学ぶ Cloud Native ベストプラクティス</p>
-</footer>
+<footer>Cloud Native AI Agent Infra PoC — README.md をそのまま描画しています</footer>
 
+<script type="module">
+  import { marked } from 'https://esm.sh/marked@13';
+  import mermaid from 'https://esm.sh/mermaid@11';
+
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    darkMode: true,
+    fontFamily: "'Segoe UI', system-ui, sans-serif",
+    themeVariables: {
+      background: '#161b27',
+      primaryColor: '#7c83ff',
+      primaryTextColor: '#cdd9f0',
+      lineColor: '#6b7a99',
+      edgeLabelBackground: '#161b27',
+    }
+  });
+
+  const loading = document.getElementById('loading');
+  const error   = document.getElementById('error');
+  const content = document.getElementById('content');
+
+  try {
+    const res = await fetch('../README.md');
+    if (!res.ok) throw new Error(res.statusText);
+    const md = await res.text();
+
+    content.innerHTML = marked.parse(md);
+
+    // marked renders ```mermaid as <pre><code class="language-mermaid">
+    // Convert to <div class="mermaid"> for Mermaid.js
+    content.querySelectorAll('pre code.language-mermaid').forEach(el => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = el.textContent;
+      el.closest('pre').replaceWith(div);
+    });
+
+    await mermaid.run({ nodes: content.querySelectorAll('.mermaid') });
+
+    loading.style.display = 'none';
+    content.style.display = '';
+  } catch (e) {
+    loading.style.display = 'none';
+    error.style.display = 'block';
+  }
+</script>
 </body>
 </html>
