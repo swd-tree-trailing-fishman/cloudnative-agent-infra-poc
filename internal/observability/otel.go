@@ -11,7 +11,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -24,17 +23,23 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 		endpoint = "localhost:4317"
 	}
 
-	conn, err := grpc.DialContext(ctx, endpoint,
+	// Use a context-scoped timeout instead of the deprecated grpc.WithTimeout option.
+	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer dialCancel()
+
+	//nolint:staticcheck // grpc.DialContext is deprecated in grpc v1.63+ but still functional;
+	// migrate to grpc.NewClient when upgrading to grpc >= 1.63.
+	conn, err := grpc.DialContext(dialCtx, endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
-		grpc.WithTimeout(5*time.Second),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to OTLP collector: %w", err)
+		return nil, fmt.Errorf("failed to connect to OTLP collector at %s: %w", endpoint, err)
 	}
 
 	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 	if err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
 	}
 
@@ -56,8 +61,4 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 	otel.SetTracerProvider(tp)
 
 	return tp.Shutdown, nil
-}
-
-func Tracer() trace.Tracer {
-	return otel.Tracer(serviceName)
 }

@@ -49,7 +49,9 @@ spec:
             namespaces: ["agent-sandbox"]
 
 ---
-# DestinationRule: agent-backend へのトラフィックで ISTIO_MUTUAL を使用
+# DestinationRule: connectionPool + outlierDetection のみ
+# Ambient mode では ztunnel が mTLS を自動処理するため tls.mode: ISTIO_MUTUAL は不要
+# (ISTIO_MUTUAL を明示するとztunnel との二重ラップで接続エラーになる)
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
@@ -58,8 +60,6 @@ metadata:
 spec:
   host: agent-backend.agent-infra.svc.cluster.local
   trafficPolicy:
-    tls:
-      mode: ISTIO_MUTUAL
     connectionPool:
       http:
         http2MaxRequests: 100
@@ -91,6 +91,10 @@ spec:
               number: 80
           weight: 100
       timeout: 10s
+      retries:
+        attempts: 3
+        perTryTimeout: 3s
+        retryOn: gateway-error,connect-failure,retriable-4xx
     - route:
         - destination:
             host: agent-backend.agent-infra.svc.cluster.local

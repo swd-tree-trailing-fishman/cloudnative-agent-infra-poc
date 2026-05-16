@@ -49,6 +49,18 @@ p{margin-bottom:.8rem;font-size:.9rem;color:var(--text)}
 .bp-k8s{background:rgba(50,108,229,.12);color:var(--k8s);border:1px solid rgba(50,108,229,.3)}
 .bp-sqs{background:rgba(255,212,59,.1);color:var(--py);border:1px solid rgba(255,212,59,.3)}
 footer{text-align:center;padding:2rem;border-top:1px solid var(--border);color:var(--muted);font-size:.82rem}
+
+/* ── Readability enhancements ── */
+body{line-height:1.72;letter-spacing:-.01em}
+p{line-height:1.78}
+main{padding:3rem 2rem 7rem}
+section{margin-bottom:5rem}
+h2{font-size:1.45rem;margin-bottom:2rem}
+h3{margin-top:2.2rem;margin-bottom:1rem}
+
+/* ── Mermaid diagram container ── */
+.mermaid-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:2rem 1.5rem;margin:1.5rem 0;overflow-x:auto}
+.mermaid svg{max-width:100%;height:auto}
 </style>
 </head>
 <body>
@@ -540,5 +552,9 @@ footer{text-align:center;padding:2rem;border-top:1px solid var(--border);color:v
 
 </main>
 <footer>Cloud Native AI Agent Infra PoC — Service Map</footer>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', darkMode: true, fontFamily: "'Segoe UI', system-ui, sans-serif" });
+</script>
 </body>
 </html>
