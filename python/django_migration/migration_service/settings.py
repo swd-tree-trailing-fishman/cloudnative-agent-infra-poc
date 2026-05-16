@@ -37,6 +37,8 @@ OTEL_SERVICE_NAME = "django-migration-service"
 # AWS / LocalStack
 AWS_ENDPOINT_URL = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
 AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-1")
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "test")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "test")
 SQS_QUEUE_URL = os.environ.get(
     "SQS_QUEUE_URL",
     "http://localhost:4566/000000000000/db-migration-queue",

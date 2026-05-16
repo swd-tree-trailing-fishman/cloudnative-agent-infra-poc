@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 # =============================================================================
 # Cloud Native AI Agent Infra - PoC Makefile
 # 前提: WSL上でkind, kubectl, helm, docker, curl がインストール済み
@@ -19,7 +21,7 @@ KEDA_VERSION   := 2.14.0
 .PHONY: all cluster-up istio-install keda-install deploy deploy-python \
         test-request test-recommend test-execute test-migration \
         send-migration-event port-forward-jaeger port-forward-app \
-        logs-backend logs-migration cluster-down clean help
+        logs-backend logs-migration cluster-down clean docs-serve help
 
 # デフォルトターゲット
 all: cluster-up deploy
@@ -210,6 +212,16 @@ logs-otel:
 	kubectl logs -n $(NAMESPACE_OBS) -l app=otel-collector --follow --tail=50
 
 # =============================================================================
+# ドキュメント
+# =============================================================================
+
+## ドキュメントをローカル HTTP サーバーで配信 (docs/index.html が README.md を動的描画)
+docs-serve:
+	@echo "📚 Docs: http://localhost:8888"
+	@echo "   docs/index.html が README.md を fetch → marked.js + Mermaid.js で描画します"
+	cd docs && python3 -m http.server 8888
+
+# =============================================================================
 # クリーンアップ
 # =============================================================================
 
@@ -247,3 +259,6 @@ help:
 	@echo "  port-forward-jaeger Jaeger UI を localhost:16686 に転送"
 	@echo "  logs-backend        Go バックエンドのログをフォロー"
 	@echo "  logs-migration      マイグレーション Job のログを表示"
+	@echo ""
+	@echo "Docs:"
+	@echo "  docs-serve          ドキュメントを localhost:8888 で配信"

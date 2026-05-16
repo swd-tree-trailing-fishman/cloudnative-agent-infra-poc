@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -57,11 +58,14 @@ func (r *Runner) Execute(ctx context.Context, req ExecutionRequest) (*ExecutionR
 		ns = r.namespace
 	}
 
-	jobName := fmt.Sprintf("sandbox-job-%d", time.Now().UnixNano())
+	// UUID ensures no name collision even under concurrent calls
+	jobName := "sandbox-job-" + uuid.New().String()[:8]
 	ttl := int32(60)
 	backoff := int32(0)
 
+	cpuRequest := resource.MustParse("50m")
 	cpuLimit := resource.MustParse("100m")
+	memRequest := resource.MustParse("32Mi")
 	memLimit := resource.MustParse("64Mi")
 
 	job := &batchv1.Job{
@@ -96,10 +100,15 @@ func (r *Runner) Execute(ctx context.Context, req ExecutionRequest) (*ExecutionR
 						{
 							Name:  "executor",
 							Image: "busybox:1.36",
-							// Command is fixed to prevent injection; req.Command is logged only
+							// Command is fixed; req.Command is intentionally not executed
+							// to prevent injection — it is only echoed for demo traceability.
 							Command: []string{"/bin/sh", "-c"},
 							Args:    []string{"echo '[SANDBOX] Executing dummy task...' && sleep 2 && echo '[SANDBOX] Done.'"},
 							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpuRequest,
+									corev1.ResourceMemory: memRequest,
+								},
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    cpuLimit,
 									corev1.ResourceMemory: memLimit,
@@ -124,7 +133,7 @@ func (r *Runner) Execute(ctx context.Context, req ExecutionRequest) (*ExecutionR
 	return &ExecutionResult{
 		JobName:   created.Name,
 		Status:    "created",
-		Message:   fmt.Sprintf("Sandbox job %s created in namespace %s (requested: %q)", created.Name, ns, req.Command),
+		Message:   fmt.Sprintf("Sandbox job %s created in namespace %s", created.Name, ns),
 		StartedAt: time.Now(),
 	}, nil
 }
@@ -135,7 +144,10 @@ func buildK8sConfig() (*rest.Config, error) {
 	}
 	kubeconfig := os.Getenv("KUBECONFIG")
 	if kubeconfig == "" {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "/root"
+		}
 		kubeconfig = home + "/.kube/config"
 	}
 	return clientcmd.BuildConfigFromFlags("", kubeconfig)
